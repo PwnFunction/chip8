@@ -1,0 +1,21 @@
+00 E0    CLS
+A2 2A    LD I, 0x22A
+60 0C    LD V0, 0x0c
+61 08    LD V1, 0x08
+D0 1F    DRW V0, V1, 0xF; I = 0x22A
+70 09    ADD V0, 0x09
+A2 39    LD I, 0x239
+D0 1F    DRW V0, V1, 0xF; I = 0x239
+A2 48    LD I, 0x248 
+70 08    ADD V0, 0x08
+D0 1F    DRW V0, V1, 0xF; I = 0x248
+70 04    ADD V0, 0x04
+A2 57    LD I, 0x257
+D0 1F    DRW V0, V1, 0xF; I = 0x257
+70 08    ADD V0, 0x08
+A2 66    LD I, 0x266
+D0 1F    DRW V0, V1, 0xF; I = 0x257
+70 08    ADD V0, 0x08
+A2 75    LD I, 0x275
+D0 1F    DRW V0, V1, 0xF; I = 0x257
+12 28    JP 0x228
