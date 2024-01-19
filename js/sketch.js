@@ -34,7 +34,6 @@ class Chip8 {
      * |  interpreter  |
      * +---------------+= 0x000 (0) Start of Chip-8 RAM
      */
-
     this.memory = new Uint8Array(4096); /* 4K */
 
     /**
@@ -59,7 +58,6 @@ class Chip8 {
      * interpreter should return to when finished with a subroutine. Chip-8 allows for
      * up to 16 levels of nested subroutines.
      */
-
     this.V = new Uint8Array(16); /* 16, 8-bit registers (V0 - VF) */
     this.I = 0x0; /* 16-bit address pointer */
     this.PC = 0x200; /* 16-bit program counter */
@@ -80,7 +78,6 @@ class Chip8 {
      * |(0,31)      (63,31)|
      * +-------------------+
      */
-
     this.frameWidth = 64;
     this.frameHeight = 32;
     this.frameBuffer = new Uint8Array(
@@ -101,7 +98,49 @@ class Chip8 {
      * digits 0 through F. These sprites are 5 bytes long, or 8x5 pixels. The data
      * should be stored in the interpreter area of Chip-8 memory (0x000 to 0x1FF).
      * Below is a listing of each character's bytes, in binary and hexadecimal:
+     *
+     * 0xF0, 0x90, 0x90, 0x90, 0xF0 // 0
+     * 0x20, 0x60, 0x20, 0x20, 0x70 // 1
+     * 0xF0, 0x10, 0xF0, 0x80, 0xF0 // 2
+     * 0xF0, 0x10, 0xF0, 0x10, 0xF0 // 3
+     * 0x90, 0x90, 0xF0, 0x10, 0x10 // 4
+     * 0xF0, 0x80, 0xF0, 0x10, 0xF0 // 5
+     * 0xF0, 0x80, 0xF0, 0x90, 0xF0 // 6
+     * 0xF0, 0x10, 0x20, 0x40, 0x40 // 7
+     * 0xF0, 0x90, 0xF0, 0x90, 0xF0 // 8
+     * 0xF0, 0x90, 0xF0, 0x10, 0xF0 // 9
+     * 0xF0, 0x90, 0xF0, 0x90, 0x90 // A
+     * 0xE0, 0x90, 0xE0, 0x90, 0xE0 // B
+     * 0xF0, 0x80, 0x80, 0x80, 0xF0 // C
+     * 0xE0, 0x90, 0x90, 0x90, 0xE0 // D
+     * 0xF0, 0x80, 0xF0, 0x80, 0xF0 // E
+     * 0xF0, 0x80, 0xF0, 0x80, 0x80 // F
+     *
+     * These fonts can be written anywhere in the interpreter memory, we'll follow
+     * a popular convention (0x50–0x9F).
      */
+    // prettier-ignore
+    this.memory.set(
+      new Uint8Array([
+        0xf0, 0x90, 0x90, 0x90, 0xf0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xf0, 0x10, 0xf0, 0x80, 0xf0, // 2
+        0xf0, 0x10, 0xf0, 0x10, 0xf0, // 3
+        0x90, 0x90, 0xf0, 0x10, 0x10, // 4
+        0xf0, 0x80, 0xf0, 0x10, 0xf0, // 5
+        0xf0, 0x80, 0xf0, 0x90, 0xf0, // 6
+        0xf0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xf0, 0x90, 0xf0, 0x90, 0xf0, // 8
+        0xf0, 0x90, 0xf0, 0x10, 0xf0, // 9
+        0xf0, 0x90, 0xf0, 0x90, 0x90, // A
+        0xe0, 0x90, 0xe0, 0x90, 0xe0, // B
+        0xf0, 0x80, 0x80, 0x80, 0xf0, // C
+        0xe0, 0x90, 0x90, 0x90, 0xe0, // D
+        0xf0, 0x80, 0xf0, 0x80, 0xf0, // E
+        0xf0, 0x80, 0xf0, 0x80, 0x80, // F
+      ]),
+      0x50
+    );
   }
 
   renderFrame() {
@@ -124,7 +163,6 @@ class Chip8 {
      * |(-32,-15)  (31,-15)|
      * +-------------------+
      */
-
     for (let px = 0; px < this.frameWidth; px++) {
       for (let py = 0; py < this.frameHeight; py++) {
         if (this.frameBuffer[py * this.frameWidth + px] === 0x1) {
@@ -156,13 +194,23 @@ class Chip8 {
       this.frameBuffer[p] = 0x1;
     }
   }
+
+  /*
+   * Fill the frame buffer with random values
+   */
+  randomFrameBuffer() {
+    for (let p = 0; p < this.frameBuffer.length; p++) {
+      this.frameBuffer[p] = Math.round(Math.random());
+    }
+  }
 }
 
+// Create a new instance of Chip8
 const chip8 = new Chip8();
-const VRAMOut = document.querySelector("#vram-out");
+let renderClock = 5;
 
 /*
- * Setup and draw functions
+ * p5 setup function
  */
 function setup() {
   createCanvas(
@@ -173,9 +221,18 @@ function setup() {
   );
 
   chip8.fillFrameBuffer();
+  console.log(chip8.memory);
 }
 
+/*
+ * p5 draw function
+ */
 function draw() {
+  if (frameCount % renderClock !== 0) {
+    return;
+  }
+
+  chip8.randomFrameBuffer();
   background(0);
   !chip8.pixelStoke && noStroke();
   chip8.renderFrame();
