@@ -180,6 +180,40 @@ class Chip8 {
   }
 
   /*
+   * Render a sprite
+   */
+  renderSprite(x, y, n) {
+    /**
+     * Dxyn - DRW Vx, Vy, nibble
+     * Display n-byte sprite starting at memory location I at (Vx, Vy),
+     * set VF = collision.
+     *
+     * The interpreter reads n bytes from memory, starting at the address stored
+     * in I. These bytes are then displayed as sprites on screen at coordinates
+     * (Vx, Vy). Sprites are XORed onto the existing screen. If this causes any
+     * pixels to be erased, VF is set to 1, otherwise it is set to 0. If the sprite
+     * is positioned so part of it is outside the coordinates of the display, it
+     * wraps around to the opposite side of the screen.
+     */
+
+    // read n bytes from memory, starting at the address stored in I
+    const spriteBytes = this.memory.subarray(chip8.I, chip8.I + n);
+
+    // render sprite
+    for (let bytesOffset = 0; bytesOffset < spriteBytes.length; bytesOffset++) {
+      let bin = ("00000000" + spriteBytes[bytesOffset].toString(2)).slice(-8);
+
+      for (let bitOffset = 0; bitOffset < bin.length; bitOffset++) {
+        this.frameBuffer[
+          x + y * this.frameWidth + this.frameWidth * bytesOffset + bitOffset
+        ] = bin[bitOffset]; // TODO: XOR
+      }
+    }
+
+    this.renderFrame();
+  }
+
+  /*
    * Clear the frame buffer
    */
   clearFrameBuffer() {
@@ -220,8 +254,8 @@ function setup() {
     document.querySelector("#display")
   );
 
-  chip8.fillFrameBuffer();
-  console.log(chip8.memory);
+  background(0);
+  console.log({ chip8 });
 }
 
 /*
@@ -232,8 +266,28 @@ function draw() {
     return;
   }
 
-  chip8.randomFrameBuffer();
+  chip8.clearFrameBuffer();
   background(0);
   !chip8.pixelStoke && noStroke();
-  chip8.renderFrame();
+
+  // TESTS
+  chip8.I = 0x50 + 5 * 1;
+  chip8.V[0x0] = 0x5;
+  chip8.V[0x1] = 0x7;
+  let n = 5; // hardcoded
+  chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
 }
+
+/**
+ * In practice, a standard speed of around 700 CHIP-8 instructions per second fits
+ * well enough for most CHIP-8 programs you’ll find, which are mostly from the 90s.
+ * Play a few different ones and get a feel for what speed seems right.
+ */
+// fetch rom from /roms/IBM-logo.ch8
+// async function loadRom() {
+//   const response = await fetch("/roms/IBM-logo.ch8");
+//   const buffer = await response.arrayBuffer();
+//   const rom = new Uint8Array(buffer);
+//   console.log(rom);
+// }
+// loadRom();
