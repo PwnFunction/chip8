@@ -209,8 +209,6 @@ class Chip8 {
         ] = bin[bitOffset]; // TODO: XOR
       }
     }
-
-    this.renderFrame();
   }
 
   /*
@@ -242,6 +240,7 @@ class Chip8 {
 // Create a new instance of Chip8
 const chip8 = new Chip8();
 let renderClock = 5;
+let test = 0;
 
 /*
  * p5 setup function
@@ -271,11 +270,14 @@ function draw() {
   !chip8.pixelStoke && noStroke();
 
   // TESTS
-  chip8.I = 0x50 + 5 * 1;
-  chip8.V[0x0] = 0x5;
-  chip8.V[0x1] = 0x7;
+
+  test++;
+  chip8.I = 0x50 + 5 * (test % 16);
+  chip8.V[0x0] = 0x0;
+  chip8.V[0x1] = 0x0;
   let n = 5; // hardcoded
   chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
+  chip8.renderFrame();
 }
 
 /**
