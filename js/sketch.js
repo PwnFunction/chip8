@@ -312,12 +312,47 @@ class Chip8 {
 
       /**
        * Dxyn - DRW Vx, Vy, nibble
-       * Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+       * Display n-byte sprite starting at memory location I at (Vx, Vy),
+       * set VF = collision.
+       *
+       * The interpreter reads n bytes from memory, starting at the address
+       * stored in I. These bytes are then displayed as sprites on screen at
+       * coordinates (Vx, Vy). Sprites are XORed onto the existing screen. If
+       * this causes any pixels to be erased, VF is set to 1, otherwise it is
+       * set to 0. If the sprite is positioned so part of it is outside the
+       * coordinates of the display, it wraps around to the opposite side of
+       * the screen.
        */
+      case (opcodes[0] & 0xf0) === 0xd0:
+        let Vx = this.V[opcodes[0] & 0x0f];
+        let Vy = this.V[(opcodes[1] & 0xf0) >> 0x4];
+        let n = opcodes[1] & 0x0f;
 
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `DRW V${opcodes[0] & 0x0f}, V${(opcodes[1] & 0xf0) >> 0x4}, ${
+              opcodes[1] & 0x0f
+            }`
+          );
+
+        for (let i = 0; i < n; i++) {
+          for (let e = 7; e >= 0; e--) {
+            this.frameBuffer[
+              Vy * this.frameWidth + Vx + (7 - e) + i * this.frameWidth
+            ] = (this.memory[this.I + i] & (2 ** e)) === 2 ** e ? 1 : 0;
+          }
+        }
+
+        break;
+
+      /**
+       * Invalid opcode
+       */
       default:
         log && this.log("err", "[EXECUTE]", "invalid opcode");
-        break;
+        throw new Error();
     }
   }
 
@@ -443,7 +478,7 @@ async function draw() {
     return;
   }
 
-  chip8.clearFrameBuffer();
+  // chip8.clearFrameBuffer();
   background(0);
   !chip8.pixelStoke && noStroke();
 
@@ -454,7 +489,7 @@ async function draw() {
   // chip8.V[0x1] = 0x0;
   // let n = 5;
   // chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
-  // chip8.renderFrame();
+  chip8.renderFrame();
 }
 
 /*
@@ -485,13 +520,29 @@ async function main() {
   chip8.memory[0x208] = 0xa2;
   chip8.memory[0x209] = 0x11;
 
+  // DRAW '0'
+  // set V2 to 4
+  chip8.memory[0x20a] = 0x62;
+  chip8.memory[0x20b] = 0x04;
+  // set V3 to 4
+  chip8.memory[0x20c] = 0x63;
+  chip8.memory[0x20d] = 0x04;
+  // set I to 0x50
+  chip8.memory[0x20e] = 0xa0;
+  chip8.memory[0x20f] = 0x50;
+  // Dxyn - DRW Vx, Vy, nibble
+  // DRW V2, V3, 5
+  chip8.memory[0x210] = 0xd2;
+  chip8.memory[0x211] = 0x35;
+
   // exec cycles
-  chip8.execute();
-  chip8.execute();
-  chip8.execute();
-  chip8.execute();
-  chip8.execute();
-  // setInterval(() => chip8.execute(), 0);
+  let cycles = 0;
+  let n = 9;
+  let execute = setInterval(() => {
+    cycles++;
+    if (cycles === n) clearInterval(execute);
+    chip8.execute();
+  }, 0);
 }
 
 main();
