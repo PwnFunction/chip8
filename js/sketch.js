@@ -143,6 +143,99 @@ class Chip8 {
     );
   }
 
+  reset() {
+    /**
+     * Resets the Chip-8 interpreter
+     */
+    this.memory.fill(0x0);
+    this.V.fill(0x0);
+    this.I = 0x0;
+    this.PC = 0x200;
+    this.SP = 0x0;
+    this.specialRegisters.fill(0x0);
+    this.stack.fill(0x0);
+    this.frameBuffer.fill(0x0);
+  }
+
+  log(type, ...message) {
+    /**
+     * Logs a message to the console
+     * @param {string} type - The type of message
+     * @param {string} message - The message to log
+     */
+    let logTypes = {
+      info: "*",
+      err: "!",
+      succ: "+",
+    };
+    console.log(logTypes[type], ...message);
+  }
+
+  fetch() {
+    /**
+     * Fetches one instruction using PC
+     *
+     * All instructions are 2 bytes long and are stored most-significant-byte
+     * first. In memory, the first byte of each instruction should be located
+     * at an even addresses.
+     */
+    const opcodes = [];
+    while (opcodes.length < 2) {
+      opcodes.push(this.memory[this.PC++]);
+    }
+
+    // TODO: MEMORY PROTECTION
+
+    this.log(
+      "info",
+      "[FETCH]",
+      "0x" + (this.PC - 2).toString(16),
+      opcodes.map((i) => "0x" + (i || 0).toString(16))
+    );
+
+    return opcodes;
+  }
+
+  execute(halt = false) {
+    /**
+     * Executes one instruction
+     */
+    const opcodes = this.fetch();
+
+    switch (!halt) {
+      // 0x00e0 CLS
+      case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
+        this.clearFrameBuffer();
+        this.log("info", "[EXECUTE]", "CLS");
+        break;
+
+      // 0x1NNN JMP
+      case (opcodes[0] & 0xf0) === 0x10:
+        const addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+        if (addr < 0x200) {
+          this.log(
+            "err",
+            "[EXECUTE]",
+            "JMP",
+            "0x" + addr.toString(16),
+            "illegal jump to reserved address"
+          );
+          break;
+        }
+        this.PC = addr;
+        this.log("info", "[EXECUTE]", "JMP", "0x" + addr.toString(16));
+        break;
+
+      // 0x6XNN LD Vx, byte
+      // case (opcodes[0] & 0xf0) === 0x60:
+      // break;
+
+      default:
+        this.log("err", "[EXECUTE]", "invalid opcode");
+        break;
+    }
+  }
+
   renderFrame() {
     /**
      * Render the frame buffer
@@ -255,12 +348,13 @@ function setup() {
 
   background(0);
   console.log({ chip8 });
+  noLoop();
 }
 
 /*
  * p5 draw function
  */
-function draw() {
+async function draw() {
   if (frameCount % renderClock !== 0) {
     return;
   }
@@ -270,26 +364,37 @@ function draw() {
   !chip8.pixelStoke && noStroke();
 
   // TESTS
-
   test++;
   chip8.I = 0x50 + 5 * (test % 16);
   chip8.V[0x0] = 0x0;
   chip8.V[0x1] = 0x0;
-  let n = 5; // hardcoded
+  let n = 5;
   chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
   chip8.renderFrame();
 }
 
-/**
- * In practice, a standard speed of around 700 CHIP-8 instructions per second fits
- * well enough for most CHIP-8 programs you’ll find, which are mostly from the 90s.
- * Play a few different ones and get a feel for what speed seems right.
+/*
+ * Entrypoint
  */
-// fetch rom from /roms/IBM-logo.ch8
-// async function loadRom() {
-//   const response = await fetch("/roms/IBM-logo.ch8");
-//   const buffer = await response.arrayBuffer();
-//   const rom = new Uint8Array(buffer);
-//   console.log(rom);
-// }
-// loadRom();
+async function main() {
+  // 00E0 - CLS
+  chip8.memory[0x200] = 0x00;
+  chip8.memory[0x201] = 0xe0;
+
+  // 1nnn - JMP addr
+  // JMP 0x234 - big endian
+  chip8.memory[0x202] = 0x12;
+  chip8.memory[0x203] = 0x04;
+
+  // 6XNN - LD Vx, byte
+  chip8.memory[0x204] = 0x60;
+  chip8.memory[0x205] = 0xde;
+
+  // exec cycles
+  chip8.execute();
+  chip8.execute();
+  chip8.execute();
+  // setInterval(() => chip8.execute(), 0);
+}
+
+main();
