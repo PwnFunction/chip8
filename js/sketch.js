@@ -202,17 +202,27 @@ class Chip8 {
      * Executes one instruction
      */
     const opcodes = this.fetch();
+    // temp
+    let addr = 0;
 
     switch (!halt) {
-      // 0x00e0 CLS
+      /**
+       * 00E0 - CLS
+       * Clear the display.
+       */
       case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
         this.clearFrameBuffer();
         log && this.log("info", "[EXECUTE]", "CLS");
         break;
 
-      // 0x1NNN JMP
+      /**
+       * 1nnn - JP addr
+       * Jump to location nnn.
+       *
+       * The interpreter sets the program counter to nnn.
+       */
       case (opcodes[0] & 0xf0) === 0x10:
-        const addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         if (addr < 0x200) {
           log &&
             this.log(
@@ -228,18 +238,52 @@ class Chip8 {
         log && this.log("info", "[EXECUTE]", "JMP", "0x" + addr.toString(16));
         break;
 
-      // 0x6XNN LD Vx, byte
+      /**
+       * 6xkk - LD Vx, byte
+       * Set Vx = kk.
+       *
+       * The interpreter puts the value kk into register Vx.
+       */
       case (opcodes[0] & 0xf0) === 0x60:
-        const register = opcodes[0] & 0x0f;
-        this.V[register] = opcodes[1];
+        this.V[opcodes[0] & 0x0f] = opcodes[1];
         log &&
           this.log(
             "info",
             "[EXECUTE]",
             "LD",
-            "V" + register.toString(16) + ",",
+            "V" + (opcodes[0] & 0x0f).toString(16) + ",",
             "0x" + opcodes[1].toString(16)
           );
+        break;
+
+      /**
+       * 7xkk - ADD Vx, byte
+       * Set Vx = Vx + kk.
+       *
+       * Adds the value kk to the value of register Vx, then stores the result in Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x70:
+        this.V[opcodes[0] & 0x0f] += opcodes[1];
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            "ADD",
+            "V" + (opcodes[0] & 0x0f).toString(16) + ",",
+            "0x" + opcodes[1].toString(16)
+          );
+        break;
+
+      /**
+       * Annn - LD I, addr
+       * Set I = nnn.
+       *
+       * The value of register I is set to nnn.
+       */
+      case (opcodes[0] & 0xf0) === 0xa0:
+        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+        this.I = addr;
+        log && this.log("info", "[EXECUTE]", "LD I,", "0x" + addr.toString(16));
         break;
 
       default:
@@ -360,7 +404,6 @@ function setup() {
 
   background(0);
   console.log({ chip8 });
-  noLoop();
 }
 
 /*
@@ -376,13 +419,13 @@ async function draw() {
   !chip8.pixelStoke && noStroke();
 
   // TESTS
-  test++;
-  chip8.I = 0x50 + 5 * (test % 16);
-  chip8.V[0x0] = 0x0;
-  chip8.V[0x1] = 0x0;
-  let n = 5;
-  chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
-  chip8.renderFrame();
+  // test++;
+  // chip8.I = 0x50 + 5 * (test % 16);
+  // chip8.V[0x0] = 0x0;
+  // chip8.V[0x1] = 0x0;
+  // let n = 5;
+  // chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
+  // chip8.renderFrame();
 }
 
 /*
@@ -398,11 +441,24 @@ async function main() {
   chip8.memory[0x202] = 0x12;
   chip8.memory[0x203] = 0x04;
 
-  // 6XNN - LD Vx, byte
+  // 6xkk - LD Vx, byte
+  // LD V0, 0xde
   chip8.memory[0x204] = 0x60;
   chip8.memory[0x205] = 0xde;
 
+  // 7xkk - ADD Vx, byte
+  // ADD V1, 0xad
+  chip8.memory[0x206] = 0x71;
+  chip8.memory[0x207] = 0xad;
+
+  // Annn - LD I, addr
+  // LD I, 0x211
+  chip8.memory[0x208] = 0xa2;
+  chip8.memory[0x209] = 0x11;
+
   // exec cycles
+  chip8.execute();
+  chip8.execute();
   chip8.execute();
   chip8.execute();
   chip8.execute();
