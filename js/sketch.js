@@ -171,7 +171,7 @@ class Chip8 {
     console.log(logTypes[type], ...message);
   }
 
-  fetch() {
+  fetch(log = false) {
     /**
      * Fetches one instruction using PC
      *
@@ -186,17 +186,18 @@ class Chip8 {
 
     // TODO: MEMORY PROTECTION
 
-    this.log(
-      "info",
-      "[FETCH]",
-      "0x" + (this.PC - 2).toString(16),
-      opcodes.map((i) => "0x" + (i || 0).toString(16))
-    );
+    log &&
+      this.log(
+        "info",
+        "[FETCH]",
+        `0x${(this.PC - 2).toString(16)}`,
+        opcodes.map((i) => `0x${(i || 0).toString(16)}`)
+      );
 
     return opcodes;
   }
 
-  execute(halt = false) {
+  execute(halt = false, log = true) {
     /**
      * Executes one instruction
      */
@@ -206,32 +207,43 @@ class Chip8 {
       // 0x00e0 CLS
       case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
         this.clearFrameBuffer();
-        this.log("info", "[EXECUTE]", "CLS");
+        log && this.log("info", "[EXECUTE]", "CLS");
         break;
 
       // 0x1NNN JMP
       case (opcodes[0] & 0xf0) === 0x10:
         const addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         if (addr < 0x200) {
-          this.log(
-            "err",
-            "[EXECUTE]",
-            "JMP",
-            "0x" + addr.toString(16),
-            "illegal jump to reserved address"
-          );
-          break;
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              "JMP",
+              `0x${addr.toString(16)}`,
+              "illegal jump to reserved address"
+            );
+          throw new Error();
         }
         this.PC = addr;
-        this.log("info", "[EXECUTE]", "JMP", "0x" + addr.toString(16));
+        log && this.log("info", "[EXECUTE]", "JMP", "0x" + addr.toString(16));
         break;
 
       // 0x6XNN LD Vx, byte
-      // case (opcodes[0] & 0xf0) === 0x60:
-      // break;
+      case (opcodes[0] & 0xf0) === 0x60:
+        const register = opcodes[0] & 0x0f;
+        this.V[register] = opcodes[1];
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            "LD",
+            "V" + register.toString(16) + ",",
+            "0x" + opcodes[1].toString(16)
+          );
+        break;
 
       default:
-        this.log("err", "[EXECUTE]", "invalid opcode");
+        log && this.log("err", "[EXECUTE]", "invalid opcode");
         break;
     }
   }
