@@ -203,7 +203,8 @@ class Chip8 {
      */
     const opcodes = this.fetch();
     // temp
-    let addr = 0;
+    let addr = 0,
+      register;
 
     switch (!halt) {
       /**
@@ -228,14 +229,13 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
-              "JMP",
-              `0x${addr.toString(16)}`,
+              `JMP 0x${addr.toString(16)}`,
               "illegal jump to reserved address"
             );
           throw new Error();
         }
         this.PC = addr;
-        log && this.log("info", "[EXECUTE]", "JMP", "0x" + addr.toString(16));
+        log && this.log("info", "[EXECUTE]", `JMP 0x${addr.toString(16)}`);
         break;
 
       /**
@@ -245,14 +245,26 @@ class Chip8 {
        * The interpreter puts the value kk into register Vx.
        */
       case (opcodes[0] & 0xf0) === 0x60:
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              `LD VF, 0x${opcodes[1].toString(16)}`,
+              "(VF register is reserved, cannot perform write)"
+            );
+          throw new Error();
+        }
+
         this.V[opcodes[0] & 0x0f] = opcodes[1];
         log &&
           this.log(
             "info",
             "[EXECUTE]",
-            "LD",
-            "V" + (opcodes[0] & 0x0f).toString(16) + ",",
-            "0x" + opcodes[1].toString(16)
+            `LD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
+              16
+            )}`
           );
         break;
 
@@ -263,14 +275,26 @@ class Chip8 {
        * Adds the value kk to the value of register Vx, then stores the result in Vx.
        */
       case (opcodes[0] & 0xf0) === 0x70:
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              `ADD VF, 0x${opcodes[1].toString(16)}`,
+              "(VF register is reserved, cannot perform write)"
+            );
+          throw new Error();
+        }
+
         this.V[opcodes[0] & 0x0f] += opcodes[1];
         log &&
           this.log(
             "info",
             "[EXECUTE]",
-            "ADD",
-            "V" + (opcodes[0] & 0x0f).toString(16) + ",",
-            "0x" + opcodes[1].toString(16)
+            `ADD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
+              16
+            )}`
           );
         break;
 
@@ -283,8 +307,13 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0xa0:
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         this.I = addr;
-        log && this.log("info", "[EXECUTE]", "LD I,", "0x" + addr.toString(16));
+        log && this.log("info", "[EXECUTE]", `LD I, 0x${addr.toString(16)}`);
         break;
+
+      /**
+       * Dxyn - DRW Vx, Vy, nibble
+       * Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+       */
 
       default:
         log && this.log("err", "[EXECUTE]", "invalid opcode");
@@ -388,6 +417,7 @@ class Chip8 {
 
 // Create a new instance of Chip8
 const chip8 = new Chip8();
+console.log({ chip8 });
 let renderClock = 5;
 let test = 0;
 
@@ -403,7 +433,6 @@ function setup() {
   );
 
   background(0);
-  console.log({ chip8 });
 }
 
 /*
