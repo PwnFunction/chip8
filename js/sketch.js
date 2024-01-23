@@ -143,26 +143,12 @@ class Chip8 {
     );
   }
 
-  reset() {
-    /**
-     * Resets the Chip-8 interpreter
-     */
-    this.memory.fill(0x0);
-    this.V.fill(0x0);
-    this.I = 0x0;
-    this.PC = 0x200;
-    this.SP = 0x0;
-    this.specialRegisters.fill(0x0);
-    this.stack.fill(0x0);
-    this.frameBuffer.fill(0x0);
-  }
-
+  /**
+   * Logs a message to the console
+   * @param {string} type - The type of message
+   * @param {string} message - The message to log
+   */
   log(type, ...message) {
-    /**
-     * Logs a message to the console
-     * @param {string} type - The type of message
-     * @param {string} message - The message to log
-     */
     let logTypes = {
       info: "*",
       err: "!",
@@ -171,10 +157,11 @@ class Chip8 {
     console.log(logTypes[type], ...message);
   }
 
+  /**
+   * Fetches one instruction using PC
+   */
   fetch(log = false) {
     /**
-     * Fetches one instruction using PC
-     *
      * All instructions are 2 bytes long and are stored most-significant-byte
      * first. In memory, the first byte of each instruction should be located
      * at an even addresses.
@@ -197,9 +184,12 @@ class Chip8 {
     return opcodes;
   }
 
+  /**
+   * Executes one instruction
+   */
   execute(halt = false, log = true) {
     /**
-     * Executes one instruction
+     * Fetch 2 bytes (2 half instructions)
      */
     const opcodes = this.fetch();
     // temp
@@ -343,6 +333,7 @@ class Chip8 {
               Vy * this.frameWidth + Vx + (7 - e) + i * this.frameWidth
             ] = (this.memory[this.I + i] & (2 ** e)) === 2 ** e ? 1 : 0;
           }
+          // TODO do proper way with xor and vf
         }
 
         break;
@@ -356,10 +347,12 @@ class Chip8 {
     }
   }
 
+  /**
+   * Render the frame buffer
+   */
   renderFrame() {
     /**
-     * Render the frame buffer
-     *
+     * 64 x 32 pixel display
      * +-------------------+
      * |(0,0)        (63,0)|
      * |                   |
@@ -448,6 +441,25 @@ class Chip8 {
       this.frameBuffer[p] = Math.round(Math.random());
     }
   }
+
+  /**
+   * Load rom into memory
+   * @param {Uint8Array} byteArray - Raw ROM bytes
+   */
+  loadROM(byteArray) {
+    let entrypoint = 0x200;
+
+    // flush old rom data
+    this.memory.set(new Uint8Array(4096 - entrypoint).fill(0x0), entrypoint);
+    this.memory.set(byteArray, entrypoint);
+    this.log(
+      "succ",
+      "LOAD_ROM",
+      `${
+        byteArray.length
+      } bytes ROM loaded at entrypoint 0x${entrypoint.toString(16)}`
+    );
+  }
 }
 
 // Create a new instance of Chip8
@@ -496,6 +508,36 @@ async function draw() {
  * Entrypoint
  */
 async function main() {
+  // let rom = [
+  //   // CLS
+  //   0x00, 0xe0,
+  //   // LD V2, 0x04
+  //   0x62, 0x04,
+  //   // LD V3, 0x04
+  //   0x63, 0x04,
+  //   // LD I, 0x50
+  //   0xa0, 0x50,
+  //   // DRW V2, V3, 5
+  //   0xd2, 0x35,
+  // ];
+  // chip8.loadROM(rom);
+
+  // fetch rom from /roms/ibm-logo.ch8
+  let rom = await fetch("/roms/ibm-logo.ch8");
+  rom = new Uint8Array(await rom.arrayBuffer());
+  chip8.loadROM(rom);
+
+  // exec cycles
+  let cycles = 0;
+  let n = rom.length / 2;
+  let execute = setInterval(() => {
+    cycles++;
+    if (cycles === n) clearInterval(execute);
+    chip8.execute();
+  }, 0);
+}
+
+function test_program() {
   // 00E0 - CLS
   chip8.memory[0x200] = 0x00;
   chip8.memory[0x201] = 0xe0;
@@ -534,15 +576,6 @@ async function main() {
   // DRW V2, V3, 5
   chip8.memory[0x210] = 0xd2;
   chip8.memory[0x211] = 0x35;
-
-  // exec cycles
-  let cycles = 0;
-  let n = 9;
-  let execute = setInterval(() => {
-    cycles++;
-    if (cycles === n) clearInterval(execute);
-    chip8.execute();
-  }, 0);
 }
 
 main();
