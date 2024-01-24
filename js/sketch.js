@@ -169,6 +169,7 @@ class Chip8 {
 
   /**
    * Fetches one instruction using PC
+   * @param {boolean} log - Log level
    */
   fetch(log = false) {
     /**
@@ -196,6 +197,8 @@ class Chip8 {
 
   /**
    * Executes one instruction
+   * @param {boolean} halt - Halt execution
+   * @param {boolean} log - Log level
    */
   execute(halt = false, log = true) {
     /**
@@ -203,8 +206,7 @@ class Chip8 {
      */
     const opcodes = this.fetch();
     // temp
-    let addr = 0,
-      register;
+    let addr = 0;
 
     switch (!halt) {
       /**
@@ -213,7 +215,13 @@ class Chip8 {
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
         this.clearFrameBuffer();
-        log && this.log("info", "[EXECUTE]", "CLS");
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
+            "CLS"
+          );
         break;
 
       /**
@@ -229,13 +237,20 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
+              `0x${(this.PC - 2).toString(16)}:`,
               `JMP 0x${addr.toString(16)}`,
               "illegal jump to reserved address"
             );
           throw new Error();
         }
         this.PC = addr;
-        log && this.log("info", "[EXECUTE]", `JMP 0x${addr.toString(16)}`);
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
+            `JMP 0x${addr.toString(16)}`
+          );
         break;
 
       /**
@@ -251,6 +266,7 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
+              `0x${(this.PC - 2).toString(16)}:`,
               `LD VF, 0x${opcodes[1].toString(16)}`,
               "(VF register is reserved, cannot perform write)"
             );
@@ -262,6 +278,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
             `LD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
               16
             )}`
@@ -281,6 +298,7 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
+              `0x${(this.PC - 2).toString(16)}:`,
               `ADD VF, 0x${opcodes[1].toString(16)}`,
               "(VF register is reserved, cannot perform write)"
             );
@@ -292,6 +310,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
             `ADD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
               16
             )}`
@@ -307,7 +326,13 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0xa0:
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         this.I = addr;
-        log && this.log("info", "[EXECUTE]", `LD I, 0x${addr.toString(16)}`);
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
+            `LD I, 0x${addr.toString(16)}`
+          );
         break;
 
       /**
@@ -332,6 +357,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
             `DRW V${opcodes[0] & 0x0f}, V${(opcodes[1] & 0xf0) >> 0x4}, ${
               opcodes[1] & 0x0f
             }`
@@ -361,7 +387,13 @@ class Chip8 {
        * Invalid opcode
        */
       default:
-        log && this.log("err", "[EXECUTE]", "invalid opcode");
+        log &&
+          this.log(
+            "err",
+            "[EXECUTE]",
+            `0x${(this.PC - 2).toString(16)}:`,
+            "invalid opcode"
+          );
         throw new Error();
     }
   }
@@ -432,6 +464,7 @@ class Chip8 {
   /**
    * Load rom into memory
    * @param {Uint8Array} byteArray - Raw ROM bytes
+   * @param {boolean} log - Log level
    */
   loadROM(byteArray, log = true) {
     let entrypoint = 0x200;
