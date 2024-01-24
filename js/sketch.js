@@ -1,3 +1,13 @@
+/**
+ * Chip-8 Emulator in JavaScript (using p5.js)
+ * Written by: PwnFunction
+ * https://en.wikipedia.org/wiki/CHIP-8
+ *
+ * References:
+ * http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+ * https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
+ */
+
 class Chip8 {
   constructor() {
     /**
@@ -329,11 +339,20 @@ class Chip8 {
 
         for (let i = 0; i < n; i++) {
           for (let e = 7; e >= 0; e--) {
-            this.frameBuffer[
-              Vy * this.frameWidth + Vx + (7 - e) + i * this.frameWidth
-            ] = (this.memory[this.I + i] & (2 ** e)) === 2 ** e ? 1 : 0;
+            let frameBufferOffset =
+              Vy * this.frameWidth + Vx + (7 - e) + i * this.frameWidth;
+
+            let prevPixel = this.frameBuffer[frameBufferOffset];
+            let newPixel =
+              (this.memory[this.I + i] & (2 ** e)) === 2 ** e ? 1 : 0;
+
+            // destructive xor update
+            this.frameBuffer[frameBufferOffset] ^= newPixel;
+
+            if (prevPixel === 1 && newPixel === 1) {
+              this.V[0xf] = 1; // collision flag
+            }
           }
-          // TODO do proper way with xor and vf
         }
 
         break;
@@ -348,7 +367,7 @@ class Chip8 {
   }
 
   /**
-   * Render the frame buffer
+   * Render the linear frame buffer
    */
   renderFrame() {
     /**
@@ -386,38 +405,6 @@ class Chip8 {
   }
 
   /*
-   * Render a sprite
-   */
-  renderSprite(x, y, n) {
-    /**
-     * Dxyn - DRW Vx, Vy, nibble
-     * Display n-byte sprite starting at memory location I at (Vx, Vy),
-     * set VF = collision.
-     *
-     * The interpreter reads n bytes from memory, starting at the address stored
-     * in I. These bytes are then displayed as sprites on screen at coordinates
-     * (Vx, Vy). Sprites are XORed onto the existing screen. If this causes any
-     * pixels to be erased, VF is set to 1, otherwise it is set to 0. If the sprite
-     * is positioned so part of it is outside the coordinates of the display, it
-     * wraps around to the opposite side of the screen.
-     */
-
-    // read n bytes from memory, starting at the address stored in I
-    const spriteBytes = this.memory.subarray(chip8.I, chip8.I + n);
-
-    // render sprite
-    for (let bytesOffset = 0; bytesOffset < spriteBytes.length; bytesOffset++) {
-      let bin = ("00000000" + spriteBytes[bytesOffset].toString(2)).slice(-8);
-
-      for (let bitOffset = 0; bitOffset < bin.length; bitOffset++) {
-        this.frameBuffer[
-          x + y * this.frameWidth + this.frameWidth * bytesOffset + bitOffset
-        ] = bin[bitOffset]; // TODO: XOR
-      }
-    }
-  }
-
-  /*
    * Clear the frame buffer
    */
   clearFrameBuffer() {
@@ -446,19 +433,21 @@ class Chip8 {
    * Load rom into memory
    * @param {Uint8Array} byteArray - Raw ROM bytes
    */
-  loadROM(byteArray) {
+  loadROM(byteArray, log = true) {
     let entrypoint = 0x200;
 
     // flush old rom data
     this.memory.set(new Uint8Array(4096 - entrypoint).fill(0x0), entrypoint);
     this.memory.set(byteArray, entrypoint);
-    this.log(
-      "succ",
-      "LOAD_ROM",
-      `${
-        byteArray.length
-      } bytes ROM loaded at entrypoint 0x${entrypoint.toString(16)}`
-    );
+    log &&
+      this.log(
+        "succ",
+        "[LOAD_ROM]",
+        `[${byteArray.slice(0, 3)} ... ${byteArray.slice(-1)}]`,
+        `(${
+          byteArray.length
+        } bytes) ROM loaded at entrypoint 0x${entrypoint.toString(16)}`
+      );
   }
 }
 
@@ -490,17 +479,8 @@ async function draw() {
     return;
   }
 
-  // chip8.clearFrameBuffer();
   background(0);
   !chip8.pixelStoke && noStroke();
-
-  // TESTS
-  // test++;
-  // chip8.I = 0x50 + 5 * (test % 16);
-  // chip8.V[0x0] = 0x0;
-  // chip8.V[0x1] = 0x0;
-  // let n = 5;
-  // chip8.renderSprite(chip8.V[0x0], chip8.V[0x1], n);
   chip8.renderFrame();
 }
 
@@ -508,24 +488,7 @@ async function draw() {
  * Entrypoint
  */
 async function main() {
-  // let rom = [
-  //   // CLS
-  //   0x00, 0xe0,
-  //   // LD V2, 0x04
-  //   0x62, 0x04,
-  //   // LD V3, 0x04
-  //   0x63, 0x04,
-  //   // LD I, 0x50
-  //   0xa0, 0x50,
-  //   // DRW V2, V3, 5
-  //   0xd2, 0x35,
-  // ];
-  // chip8.loadROM(rom);
-
-  // fetch rom from /roms/ibm-logo.ch8
-  let rom = await fetch("/roms/ibm-logo.ch8");
-  rom = new Uint8Array(await rom.arrayBuffer());
-  chip8.loadROM(rom);
+  let rom = await ibm_logo_program();
 
   // exec cycles
   let cycles = 0;
@@ -535,6 +498,14 @@ async function main() {
     if (cycles === n) clearInterval(execute);
     chip8.execute();
   }, 0);
+}
+
+async function ibm_logo_program() {
+  // fetch rom from /roms/ibm-logo.ch8
+  let rom = await fetch("/roms/ibm-logo.ch8");
+  rom = new Uint8Array(await rom.arrayBuffer());
+  chip8.loadROM(rom);
+  return rom;
 }
 
 function test_program() {
@@ -576,6 +547,20 @@ function test_program() {
   // DRW V2, V3, 5
   chip8.memory[0x210] = 0xd2;
   chip8.memory[0x211] = 0x35;
+
+  // let rom = [
+  //   // CLS
+  //   0x00, 0xe0,
+  //   // LD V2, 0x04
+  //   0x62, 0x04,
+  //   // LD V3, 0x04
+  //   0x63, 0x04,
+  //   // LD I, 0x50
+  //   0xa0, 0x50,
+  //   // DRW V2, V3, 5
+  //   0xd2, 0x35,
+  // ];
+  // chip8.loadROM(rom);
 }
 
 main();
