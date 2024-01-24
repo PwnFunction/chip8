@@ -239,6 +239,37 @@ class Chip8 {
         break;
 
       /**
+       * 00EE - RET
+       * Return from a subroutine.
+       *
+       * The interpreter sets the program counter to the address at the top of
+       * the stack, then subtracts 1 from the stack pointer.
+       */
+      case opcodes[0] === 0x0 && opcodes[1] === 0xee:
+        if (this.SP === 0) {
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+              "cannot return, call stack is empty"
+            );
+          throw new Error();
+        }
+
+        this.PC = this.stack[this.SP--];
+
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+            `RET`
+          );
+
+        break;
+
+      /**
        * 1nnn - JP addr
        * Jump to location nnn.
        *
@@ -668,8 +699,11 @@ async function test_jmp() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
-    // CALL 0x200
-    0x22, 0x00,
+    // CALL 0x20c
+    0x22, 0x0c,
+    // subroutine
+    // RET
+    0x00, 0xee,
   ];
   chip8.loadROM(rom);
   return rom;
