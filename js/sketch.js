@@ -151,6 +151,9 @@ class Chip8 {
       ]),
       0x50
     );
+
+    // logger
+    this.instructionCount = 0;
   }
 
   /**
@@ -192,6 +195,7 @@ class Chip8 {
         opcodes.map((i) => `0x${(i || 0).toString(16)}`)
       );
 
+    this.instructionCount++;
     return opcodes;
   }
 
@@ -210,6 +214,16 @@ class Chip8 {
 
     switch (!halt) {
       /**
+       * 0nnn - SYS addr
+       * Jump to a machine code routine at nnn.
+       *
+       * This instruction is only used on the old computers on which Chip-8 was
+       * originally implemented. It is ignored by modern interpreters.
+       */
+      case opcodes[0] & (0xf0 === 0x0):
+        break;
+
+      /**
        * 00E0 - CLS
        * Clear the display.
        */
@@ -219,7 +233,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             "CLS"
           );
         break;
@@ -237,7 +251,7 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
-              `0x${(this.PC - 2).toString(16)}:`,
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
               `JMP 0x${addr.toString(16)}`,
               "illegal jump to reserved address"
             );
@@ -248,8 +262,54 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             `JMP 0x${addr.toString(16)}`
+          );
+        break;
+
+      /**
+       * 2nnn - CALL addr
+       * Call subroutine at nnn.
+       *
+       * The interpreter increments the stack pointer, then puts the current PC on
+       * the top of the stack. The PC is then set to nnn.
+       */
+      case (opcodes[0] & 0xf0) === 0x20:
+        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+        // out of bounds gaurd
+        if (addr < 0x200) {
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+              `CALL 0x${addr.toString(16)}`,
+              "illegal subroutine call to reserved address"
+            );
+          throw new Error();
+        }
+        // stack overflow gaurd
+        if (this.SP >= this.stack.length) {
+          log &&
+            this.log(
+              "err",
+              "[EXECUTE]",
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+              `CALL 0x${addr.toString(16)}`,
+              "call stack exceeded"
+            );
+          throw new Error();
+        }
+
+        this.stack[this.SP++] = this.PC;
+        this.PC = addr;
+
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+            `CALL 0x${addr.toString(16)}`
           );
         break;
 
@@ -266,7 +326,7 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
-              `0x${(this.PC - 2).toString(16)}:`,
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
               `LD VF, 0x${opcodes[1].toString(16)}`,
               "(VF register is reserved, cannot perform write)"
             );
@@ -278,7 +338,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             `LD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
               16
             )}`
@@ -298,7 +358,7 @@ class Chip8 {
             this.log(
               "err",
               "[EXECUTE]",
-              `0x${(this.PC - 2).toString(16)}:`,
+              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
               `ADD VF, 0x${opcodes[1].toString(16)}`,
               "(VF register is reserved, cannot perform write)"
             );
@@ -310,7 +370,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             `ADD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
               16
             )}`
@@ -330,7 +390,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             `LD I, 0x${addr.toString(16)}`
           );
         break;
@@ -357,7 +417,7 @@ class Chip8 {
           this.log(
             "info",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             `DRW V${opcodes[0] & 0x0f}, V${(opcodes[1] & 0xf0) >> 0x4}, ${
               opcodes[1] & 0x0f
             }`
@@ -391,7 +451,7 @@ class Chip8 {
           this.log(
             "err",
             "[EXECUTE]",
-            `0x${(this.PC - 2).toString(16)}:`,
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
             "invalid opcode"
           );
         throw new Error();
@@ -521,7 +581,7 @@ async function draw() {
  * Entrypoint
  */
 async function main() {
-  let rom = await ibm_logo_program();
+  let rom = await test_jmp();
 
   // exec cycles
   let cycles = 0;
@@ -541,7 +601,7 @@ async function ibm_logo_program() {
   return rom;
 }
 
-function test_program() {
+async function test_program() {
   // 00E0 - CLS
   chip8.memory[0x200] = 0x00;
   chip8.memory[0x201] = 0xe0;
@@ -594,6 +654,25 @@ function test_program() {
   //   0xd2, 0x35,
   // ];
   // chip8.loadROM(rom);
+}
+
+async function test_jmp() {
+  let rom = [
+    // CLS
+    0x00, 0xe0,
+    // LD V2, 0x04
+    0x62, 0x04,
+    // LD V3, 0x04
+    0x63, 0x04,
+    // LD I, 0x50
+    0xa0, 0x50,
+    // DRW V2, V3, 5
+    0xd2, 0x35,
+    // CALL 0x200
+    0x22, 0x00,
+  ];
+  chip8.loadROM(rom);
+  return rom;
 }
 
 main();
