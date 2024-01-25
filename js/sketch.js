@@ -95,7 +95,7 @@ class Chip8 {
     ); /* 64x32-pixel monochrome display */
 
     // CONFIG
-    this.pixelBlockSize = 0xf; /* 15px x 15px */
+    this.pixelBlockSize = 0x14;
     this.pixelStoke = true; /* DEBUG */
     this.pixelJitter = false; /* DEBUG */
 
@@ -345,6 +345,27 @@ class Chip8 {
         break;
 
       /**
+       * 3xkk - SE Vx, byte
+       * Skip next instruction if Vx = kk.
+       *
+       * The interpreter compares register Vx to kk, and if they are equal, increments
+       * the program counter by 2.
+       */
+
+      case (opcodes[0] & 0xf0) === 0x30:
+        if (this.V[opcodes[0] & 0x0f] === opcodes[1]) {
+          this.PC += 2;
+        }
+        log &&
+          this.log(
+            "info",
+            "[EXECUTE]",
+            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
+            `SE V${opcodes[0] & 0x0f}, 0x${opcodes[1].toString(16)}`
+          );
+        break;
+
+      /**
        * 6xkk - LD Vx, byte
        * Set Vx = kk.
        *
@@ -483,7 +504,8 @@ class Chip8 {
             "err",
             "[EXECUTE]",
             `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            "invalid opcode"
+            "invalid opcode",
+            opcodes.map((i) => "0x" + i.toString(16))
           );
         throw new Error();
     }
@@ -578,8 +600,8 @@ class Chip8 {
 // Create a new instance of Chip8
 const chip8 = new Chip8();
 console.log({ chip8 });
-let renderClock = 5;
-let test = 0;
+let renderClock = 10;
+let fpsText = document.querySelector(".display__stats__fps");
 
 /*
  * p5 setup function
@@ -600,7 +622,7 @@ function setup() {
  */
 async function draw() {
   if (frameCount % renderClock !== 0) {
-    return;
+    fpsText.innerText = `${parseInt(frameRate(), 10)} FPS`;
   }
 
   background(0);
@@ -612,7 +634,7 @@ async function draw() {
  * Entrypoint
  */
 async function main() {
-  let rom = await test_jmp();
+  let rom = await ibm_logo_program();
 
   // exec cycles
   let cycles = 0;
@@ -689,21 +711,26 @@ async function test_program() {
 
 async function test_jmp() {
   let rom = [
-    // CLS
-    0x00, 0xe0,
-    // LD V2, 0x04
-    0x62, 0x04,
-    // LD V3, 0x04
-    0x63, 0x04,
-    // LD I, 0x50
-    0xa0, 0x50,
-    // DRW V2, V3, 5
-    0xd2, 0x35,
-    // CALL 0x20c
-    0x22, 0x0c,
-    // subroutine
-    // RET
-    0x00, 0xee,
+    0x00,
+    0xe0, // 0x200 CLS
+
+    0x12,
+    0x0c, // 0x202 JMP 0x20c
+
+    0x60,
+    0x04, // 0x204 LD V0, 0x4
+
+    0x61,
+    0x04, // 0x206 LD V1, 0x4
+
+    0xd0,
+    0x15, // 0x208 DRW V0, V1, 5
+
+    0x00,
+    0xee, // 0x20a RET
+
+    0x22,
+    0x04, // 0x20c CALL 0x204
   ];
   chip8.loadROM(rom);
   return rom;

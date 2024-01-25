@@ -7,8 +7,18 @@
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
-    <!-- display -->
-    <canvas id="display" width="640" height="320"></canvas>
+    <main class="rom">
+      <div class="display">
+        <canvas id="display"></canvas>
+        <div class="display__stats">
+          <span class="display__stats__fps">FPS</span>
+        </div>
+      </div>
+      <div class="disass">2</div>
+      <div class="reg">3</div>
+      <div class="vmem">4</div>
+      <div class="mem">5</div>
+    </main>
 
     <!-- p5 -->
     <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.js"></script>

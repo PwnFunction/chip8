@@ -2,13 +2,47 @@ body {
   background: #000;
   color: #fff;
   font-family: monospace;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
-#display {
-  border: 1px solid #333;
+.rom {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
 }
 
-#vram-wrapper {
-  border: 1px solid #333;
-  padding: 10px;
+.display {
+  grid-area: 1 / 1 / 4 / 4;
+  border-bottom: 1px solid #333;
+}
+.display__stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+.display__stats__fps {
+  margin-right: 6px;
+}
+
+.disass {
+  grid-area: 4 / 1 / 7 / 4;
+  /* border: 1px solid red; */
+}
+.reg {
+  grid-area: 1 / 4 / 7 / 5;
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+}
+.vmem {
+  grid-area: 1 / 5 / 4 / 7;
+  border-bottom: 1px solid #333;
+}
+.mem {
+  grid-area: 4 / 5 / 7 / 7;
 }
