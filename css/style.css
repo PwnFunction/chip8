@@ -6,6 +6,10 @@ body {
   margin: 0;
   padding: 0;
 }
+::selection {
+  color: white;
+  background: #333;
+}
 
 .rom {
   height: 100vh;
@@ -19,11 +23,17 @@ body {
 .display {
   grid-area: 1 / 1 / 4 / 4;
   border-bottom: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 .display__stats {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  margin-right: 30px;
+  gap: 4px;
   width: 100%;
 }
 .display__stats__fps {
@@ -34,15 +44,43 @@ body {
   grid-area: 4 / 1 / 7 / 4;
   /* border: 1px solid red; */
 }
+
+/* reg */
 .reg {
   grid-area: 1 / 4 / 7 / 5;
   border-left: 1px solid #333;
   border-right: 1px solid #333;
 }
+
+/* VMEM */
 .vmem {
   grid-area: 1 / 5 / 4 / 7;
-  border-bottom: 1px solid #333;
 }
+
+/* VMEM, MEM */
+.vmem,
+.mem {
+  border-bottom: 1px solid #333;
+  overflow-y: scroll;
+}
+.vmem > pre,
+.mem > pre,
+.reg > pre {
+  padding: 0;
+  margin: 0;
+  color: #777;
+}
+.vmem > .top,
+.mem > .top,
+.reg > .top {
+  margin: 10px;
+}
+
+/* MEM */
 .mem {
   grid-area: 4 / 5 / 7 / 7;
+}
+
+.update-text {
+  color: #ff4473;
 }

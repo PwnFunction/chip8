@@ -12,12 +12,37 @@
         <canvas id="display"></canvas>
         <div class="display__stats">
           <span class="display__stats__fps">FPS</span>
+          <button onclick="chip8.clearFrameBuffer()">cls</button>
         </div>
       </div>
-      <div class="disass">2</div>
-      <div class="reg">3</div>
-      <div class="vmem">4</div>
-      <div class="mem">5</div>
+      <div class="disass">DISASSEMBLY</div>
+
+      <!-- REG & STACK -->
+      <div class="reg">
+        <div class="top">
+          <span>REGISTERS & STACK</span>
+          <button id="refresh" onclick="updateRegDump()">refresh</button>
+        </div>
+        <pre><code id="reg-dump"></code></pre>
+      </div>
+
+      <!-- VMEM -->
+      <div class="vmem">
+        <div class="top">
+          <span>VMEM</span>
+          <button id="refresh" onclick="updateVmemDump()">refresh</button>
+        </div>
+        <pre><code id="vmem-dump"></code></pre>
+      </div>
+
+      <!-- HEAP -->
+      <div class="mem">
+        <div class="top">
+          <span>HEAP</span>
+          <button id="refresh" onclick="updateHeapDump()">refresh</button>
+        </div>
+        <pre><code id="heap-dump"></code></pre>
+      </div>
     </main>
 
     <!-- p5 -->

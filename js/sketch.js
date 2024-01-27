@@ -95,7 +95,7 @@ class Chip8 {
     ); /* 64x32-pixel monochrome display */
 
     // CONFIG
-    this.pixelBlockSize = 0x14;
+    this.pixelBlockSize = 0x13;
     this.pixelStoke = true; /* DEBUG */
     this.pixelJitter = false; /* DEBUG */
 
@@ -157,24 +157,9 @@ class Chip8 {
   }
 
   /**
-   * Logs a message to the console
-   * @param {string} type - The type of message
-   * @param {string} message - The message to log
-   */
-  log(type, ...message) {
-    let logTypes = {
-      info: "*",
-      err: "!",
-      succ: "+",
-    };
-    console.log(logTypes[type], ...message);
-  }
-
-  /**
    * Fetches one instruction using PC
-   * @param {boolean} log - Log level
    */
-  fetch(log = false) {
+  fetch() {
     /**
      * All instructions are 2 bytes long and are stored most-significant-byte
      * first. In memory, the first byte of each instruction should be located
@@ -185,16 +170,6 @@ class Chip8 {
       opcodes.push(this.memory[this.PC++]);
     }
 
-    // TODO: MEMORY PROTECTION
-
-    log &&
-      this.log(
-        "info",
-        "[FETCH]",
-        `0x${(this.PC - 2).toString(16)}`,
-        opcodes.map((i) => `0x${(i || 0).toString(16)}`)
-      );
-
     this.instructionCount++;
     return opcodes;
   }
@@ -202,9 +177,8 @@ class Chip8 {
   /**
    * Executes one instruction
    * @param {boolean} halt - Halt execution
-   * @param {boolean} log - Log level
    */
-  execute(halt = false, log = true) {
+  execute(halt = false) {
     /**
      * Fetch 2 bytes (2 half instructions)
      */
@@ -229,13 +203,6 @@ class Chip8 {
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
         this.clearFrameBuffer();
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            "CLS"
-          );
         break;
 
       /**
@@ -247,26 +214,10 @@ class Chip8 {
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0xee:
         if (this.SP === 0) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              "cannot return, call stack is empty"
-            );
-          throw new Error();
+          throw new Error("cannot return, call stack is empty");
         }
 
         this.PC = this.stack[this.SP--];
-
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `RET`
-          );
-
         break;
 
       /**
@@ -278,24 +229,10 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0x10:
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         if (addr < 0x200) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              `JMP 0x${addr.toString(16)}`,
-              "illegal jump to reserved address"
-            );
-          throw new Error();
+          throw new Error("illegal jump to reserved address");
         }
+
         this.PC = addr;
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `JMP 0x${addr.toString(16)}`
-          );
         break;
 
       /**
@@ -307,41 +244,19 @@ class Chip8 {
        */
       case (opcodes[0] & 0xf0) === 0x20:
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+
         // out of bounds gaurd
         if (addr < 0x200) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              `CALL 0x${addr.toString(16)}`,
-              "illegal subroutine call to reserved address"
-            );
-          throw new Error();
+          throw new Error("illegal subroutine call to reserved address");
         }
+
         // stack overflow gaurd
         if (this.SP >= this.stack.length) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              `CALL 0x${addr.toString(16)}`,
-              "call stack exceeded"
-            );
-          throw new Error();
+          throw new Error("call stack exceeded");
         }
 
         this.stack[this.SP++] = this.PC;
         this.PC = addr;
-
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `CALL 0x${addr.toString(16)}`
-          );
         break;
 
       /**
@@ -356,13 +271,6 @@ class Chip8 {
         if (this.V[opcodes[0] & 0x0f] === opcodes[1]) {
           this.PC += 2;
         }
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `SE V${opcodes[0] & 0x0f}, 0x${opcodes[1].toString(16)}`
-          );
         break;
 
       /**
@@ -374,27 +282,10 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0x60:
         // VF write gaurd
         if ((opcodes[0] & 0x0f) === 0xf) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              `LD VF, 0x${opcodes[1].toString(16)}`,
-              "(VF register is reserved, cannot perform write)"
-            );
-          throw new Error();
+          throw new Error("(VF register is reserved, cannot perform write)");
         }
 
         this.V[opcodes[0] & 0x0f] = opcodes[1];
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `LD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
-              16
-            )}`
-          );
         break;
 
       /**
@@ -406,27 +297,10 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0x70:
         // VF write gaurd
         if ((opcodes[0] & 0x0f) === 0xf) {
-          log &&
-            this.log(
-              "err",
-              "[EXECUTE]",
-              `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-              `ADD VF, 0x${opcodes[1].toString(16)}`,
-              "(VF register is reserved, cannot perform write)"
-            );
-          throw new Error();
+          throw new Error("(VF register is reserved, cannot perform write)");
         }
 
         this.V[opcodes[0] & 0x0f] += opcodes[1];
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `ADD V${(opcodes[0] & 0x0f).toString(16)}, 0x${opcodes[1].toString(
-              16
-            )}`
-          );
         break;
 
       /**
@@ -438,13 +312,6 @@ class Chip8 {
       case (opcodes[0] & 0xf0) === 0xa0:
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         this.I = addr;
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `LD I, 0x${addr.toString(16)}`
-          );
         break;
 
       /**
@@ -464,16 +331,6 @@ class Chip8 {
         let Vx = this.V[opcodes[0] & 0x0f];
         let Vy = this.V[(opcodes[1] & 0xf0) >> 0x4];
         let n = opcodes[1] & 0x0f;
-
-        log &&
-          this.log(
-            "info",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            `DRW V${opcodes[0] & 0x0f}, V${(opcodes[1] & 0xf0) >> 0x4}, ${
-              opcodes[1] & 0x0f
-            }`
-          );
 
         for (let i = 0; i < n; i++) {
           for (let e = 7; e >= 0; e--) {
@@ -499,15 +356,7 @@ class Chip8 {
        * Invalid opcode
        */
       default:
-        log &&
-          this.log(
-            "err",
-            "[EXECUTE]",
-            `0x${(0x200 + 2 * this.instructionCount - 2).toString(16)}:`,
-            "invalid opcode",
-            opcodes.map((i) => "0x" + i.toString(16))
-          );
-        throw new Error();
+        throw new Error("invalid opcode");
     }
   }
 
@@ -577,23 +426,13 @@ class Chip8 {
   /**
    * Load rom into memory
    * @param {Uint8Array} byteArray - Raw ROM bytes
-   * @param {boolean} log - Log level
    */
-  loadROM(byteArray, log = true) {
+  loadROM(byteArray) {
     let entrypoint = 0x200;
 
     // flush old rom data
     this.memory.set(new Uint8Array(4096 - entrypoint).fill(0x0), entrypoint);
     this.memory.set(byteArray, entrypoint);
-    log &&
-      this.log(
-        "succ",
-        "[LOAD_ROM]",
-        `[${byteArray.slice(0, 3)} ... ${byteArray.slice(-1)}]`,
-        `(${
-          byteArray.length
-        } bytes) ROM loaded at entrypoint 0x${entrypoint.toString(16)}`
-      );
   }
 }
 
@@ -615,6 +454,17 @@ function setup() {
   );
 
   background(0);
+
+  const dump = () => {
+    updateVmemDump();
+    updateHeapDump();
+    updateRegDump();
+  };
+
+  setTimeout(() => dump(), 100);
+  setInterval(() => {
+    dump();
+  }, 10 * 1000);
 }
 
 /*
@@ -634,7 +484,7 @@ async function draw() {
  * Entrypoint
  */
 async function main() {
-  let rom = await ibm_logo_program();
+  let rom = await test_ibm();
 
   // exec cycles
   let cycles = 0;
@@ -646,7 +496,78 @@ async function main() {
   }, 0);
 }
 
-async function ibm_logo_program() {
+/**
+ * Update vmem dump
+ */
+async function updateVmemDump() {
+  let vmemDump = document.querySelector("#vmem-dump");
+
+  vmemDump.classList.add("update-text");
+  setTimeout(() => vmemDump.classList.remove("update-text"), 500);
+
+  vmemDump.innerText = ``;
+  for (let v = 0; v < chip8.frameBuffer.length; v += 32) {
+    vmemDump.innerText += `  0x${("00" + v.toString(16)).slice(
+      -3
+    )}  ${chip8.frameBuffer.slice(v, v + 16).join(" ")}  ${chip8.frameBuffer
+      .slice(v + 16, v + 32)
+      .join(" ")}\n`;
+  }
+}
+
+/**
+ * Update heap dump
+ */
+async function updateHeapDump() {
+  let heapDump = document.querySelector("#heap-dump");
+
+  heapDump.classList.add("update-text");
+  setTimeout(() => heapDump.classList.remove("update-text"), 500);
+
+  heapDump.innerText = ``;
+  for (let h = 0; h < chip8.memory.length; h += 16) {
+    let lHalf = Array.from(chip8.memory).slice(h, h + 8),
+      rHalf = Array.from(chip8.memory).slice(h + 8, h + 16);
+
+    heapDump.innerText += `  0x${("00" + h.toString(16)).slice(-3)}  ${lHalf
+      .map((i) => ("00" + i.toString(16)).slice(-2))
+      .join(" ")}  ${rHalf
+      .map((i) => ("00" + i.toString(16)).slice(-2))
+      .join(" ")}  ${lHalf
+      .concat(rHalf)
+      .map((i) => (i >= 0x20 && i <= 0x7e ? String.fromCharCode(i) : "."))
+      .join("")}\n`;
+  }
+}
+
+/**
+ * Update reg dump
+ */
+async function updateRegDump() {
+  let regDump = document.querySelector("#reg-dump");
+
+  regDump.classList.add("update-text");
+  setTimeout(() => regDump.classList.remove("update-text"), 500);
+
+  regDump.innerText = `${Array.from(chip8.V)
+    .map((v, i) => `  v${i.toString(16)} = 0x${v.toString(16)}`)
+    .join("\n")}\n\n  I = 0x${chip8.I.toString(
+    16
+  )}\n\n  PC = 0x${chip8.PC.toString(16)}\n  SP = 0x${chip8.SP.toString(
+    16
+  )}\n\n  delay = 0x${chip8.specialRegisters[0].toString(
+    16
+  )}\n  sound = 0x${chip8.specialRegisters[1].toString(
+    16
+  )}\n\n  stack\n${Array.from(chip8.stack)
+    .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
+    .join("")}`;
+}
+
+/**
+ * Test Roms
+ */
+async function test_ibm() {
   // fetch rom from /roms/ibm-logo.ch8
   let rom = await fetch("/roms/ibm-logo.ch8");
   rom = new Uint8Array(await rom.arrayBuffer());
@@ -693,20 +614,22 @@ async function test_program() {
   // DRW V2, V3, 5
   chip8.memory[0x210] = 0xd2;
   chip8.memory[0x211] = 0x35;
+}
 
-  // let rom = [
-  //   // CLS
-  //   0x00, 0xe0,
-  //   // LD V2, 0x04
-  //   0x62, 0x04,
-  //   // LD V3, 0x04
-  //   0x63, 0x04,
-  //   // LD I, 0x50
-  //   0xa0, 0x50,
-  //   // DRW V2, V3, 5
-  //   0xd2, 0x35,
-  // ];
-  // chip8.loadROM(rom);
+async function test_draw() {
+  let rom = [
+    // CLS
+    0x00, 0xe0,
+    // LD V2, 0x04
+    0x62, 0x04,
+    // LD V3, 0x04
+    0x63, 0x04,
+    // LD I, 0x50
+    0xa0, 0x50,
+    // DRW V2, V3, 5
+    0xd2, 0x35,
+  ];
+  chip8.loadROM(rom);
 }
 
 async function test_jmp() {
