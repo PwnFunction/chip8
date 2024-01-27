@@ -68,7 +68,7 @@ body {
 .reg > pre {
   padding: 0;
   margin: 0;
-  color: #777;
+  color: #999;
 }
 .vmem > .top,
 .mem > .top,
