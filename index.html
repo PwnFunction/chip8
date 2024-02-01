@@ -15,13 +15,25 @@
           <button onclick="chip8.clearFrameBuffer()">cls</button>
         </div>
       </div>
-      <div class="disass">DISASSEMBLY</div>
+
+      <!-- DISASSEMBLY -->
+      <div class="disass">
+        <div class="top">
+          <span>DISASSEMBLY</span>
+          <button id="refresh" onclick="chip8Debugger.updateDisassembly()">
+            refresh
+          </button>
+        </div>
+        <pre><code id="disass-dump"></code></pre>
+      </div>
 
       <!-- REG & STACK -->
       <div class="reg">
         <div class="top">
-          <span>REGISTERS & STACK</span>
-          <button id="refresh" onclick="updateRegDump()">refresh</button>
+          <span>REG & STACK</span>
+          <button id="refresh" onclick="chip8Debugger.updateRegDump()">
+            refresh
+          </button>
         </div>
         <pre><code id="reg-dump"></code></pre>
       </div>
@@ -29,8 +41,10 @@
       <!-- VMEM -->
       <div class="vmem">
         <div class="top">
-          <span>FRAME BUFFER</span>
-          <button id="refresh" onclick="updateVmemDump()">refresh</button>
+          <span>VMEM</span>
+          <button id="refresh" onclick="chip8Debugger.updateVmemDump()">
+            refresh
+          </button>
         </div>
         <pre><code id="vmem-dump"></code></pre>
       </div>
@@ -38,8 +52,10 @@
       <!-- HEAP -->
       <div class="mem">
         <div class="top">
-          <span>HEAP MEMORY</span>
-          <button id="refresh" onclick="updateHeapDump()">refresh</button>
+          <span>HEAP</span>
+          <button id="refresh" onclick="chip8Debugger.updateHeapDump()">
+            refresh
+          </button>
         </div>
         <pre><code id="heap-dump"></code></pre>
       </div>

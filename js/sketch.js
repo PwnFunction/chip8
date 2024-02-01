@@ -151,9 +151,6 @@ class Chip8 {
       ]),
       0x50
     );
-
-    // logger
-    this.instructionCount = 0;
   }
 
   /**
@@ -170,23 +167,15 @@ class Chip8 {
       opcodes.push(this.memory[this.PC++]);
     }
 
-    this.instructionCount++;
     return opcodes;
   }
 
   /**
-   * Executes one instruction
-   * @param {boolean} halt - Halt execution
+   * Decodes one instruction
+   * @param {Uint8Array} opcodes
    */
-  execute(halt = false) {
-    /**
-     * Fetch 2 bytes (2 half instructions)
-     */
-    const opcodes = this.fetch();
-    // temp
-    let addr = 0;
-
-    switch (!halt) {
+  decode(opcodes) {
+    switch (true) {
       /**
        * 0nnn - SYS addr
        * Jump to a machine code routine at nnn.
@@ -195,13 +184,133 @@ class Chip8 {
        * originally implemented. It is ignored by modern interpreters.
        */
       case opcodes[0] & (0xf0 === 0x0):
-        break;
+        return { mnemonic: "SYS", opcodes };
 
       /**
        * 00E0 - CLS
        * Clear the display.
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0xe0:
+        return { mnemonic: "CLS", opcodes };
+
+      /**
+       * 00EE - RET
+       * Return from a subroutine.
+       *
+       * The interpreter sets the program counter to the address at the top of
+       * the stack, then subtracts 1 from the stack pointer.
+       */
+      case opcodes[0] === 0x0 && opcodes[1] === 0xee:
+        return { mnemonic: "RET", opcodes };
+
+      /**
+       * 1nnn - JP addr
+       * Jump to location nnn.
+       *
+       * The interpreter sets the program counter to nnn.
+       */
+      case (opcodes[0] & 0xf0) === 0x10:
+        return { mnemonic: "JP", opcodes };
+
+      /**
+       * 2nnn - CALL addr
+       * Call subroutine at nnn.
+       *
+       * The interpreter increments the stack pointer, then puts the current PC on
+       * the top of the stack. The PC is then set to nnn.
+       */
+      case (opcodes[0] & 0xf0) === 0x20:
+        return { mnemonic: "CALL", opcodes };
+
+      /**
+       * 3xkk - SE Vx, byte
+       * Skip next instruction if Vx = kk.
+       *
+       * The interpreter compares register Vx to kk, and if they are equal, increments
+       * the program counter by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x30:
+        return { mnemonic: "SE", opcodes };
+
+      /**
+       * 6xkk - LD Vx, byte
+       * Set Vx = kk.
+       *
+       * The interpreter puts the value kk into register Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x60:
+        return { mnemonic: "LD", opcodes };
+
+      /**
+       * Annn - LD I, addr
+       * Set I = nnn.
+       *
+       * The value of register I is set to nnn.
+       */
+      case (opcodes[0] & 0xf0) === 0xa0:
+        return { mnemonic: "LD", opcodes };
+
+      /**
+       * 7xkk - ADD Vx, byte
+       * Set Vx = Vx + kk.
+       *
+       * Adds the value kk to the value of register Vx, then stores the result in Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x70:
+        return { mnemonic: "ADD", opcodes };
+
+      /**
+       * Dxyn - DRW Vx, Vy, nibble
+       * Display n-byte sprite starting at memory location I at (Vx, Vy),
+       * set VF = collision.
+       */
+      case (opcodes[0] & 0xf0) === 0xd0:
+        return { mnemonic: "DRW", opcodes };
+
+      /**
+       * Zero operations
+       */
+      case opcodes[0] === 0x0 && opcodes[1] === 0x0:
+        return { mnemonic: "ZERO", opcodes };
+
+      /**
+       * Invalid opcode
+       */
+      default:
+        return { mnemonic: "INVALID", opcodes };
+    }
+  }
+
+  /**
+   * Executes one instruction
+   */
+  execute() {
+    /**
+     * Fetch 2 bytes (2 half instructions)
+     */
+
+    const opcodes = this.fetch();
+    const { mnemonic } = this.decode(opcodes);
+
+    // temp
+    let addr = 0;
+
+    switch (mnemonic) {
+      /**
+       * 0nnn - SYS addr
+       * Jump to a machine code routine at nnn.
+       *
+       * This instruction is only used on the old computers on which Chip-8 was
+       * originally implemented. It is ignored by modern interpreters.
+       */
+      case "SYS":
+        break;
+
+      /**
+       * 00E0 - CLS
+       * Clear the display.
+       */
+      case "CLS":
         this.clearFrameBuffer();
         break;
 
@@ -212,7 +321,7 @@ class Chip8 {
        * The interpreter sets the program counter to the address at the top of
        * the stack, then subtracts 1 from the stack pointer.
        */
-      case opcodes[0] === 0x0 && opcodes[1] === 0xee:
+      case "RET":
         if (this.SP === 0) {
           throw new Error("cannot return, call stack is empty");
         }
@@ -226,7 +335,7 @@ class Chip8 {
        *
        * The interpreter sets the program counter to nnn.
        */
-      case (opcodes[0] & 0xf0) === 0x10:
+      case "JP":
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         if (addr < 0x200) {
           throw new Error("illegal jump to reserved address");
@@ -242,7 +351,7 @@ class Chip8 {
        * The interpreter increments the stack pointer, then puts the current PC on
        * the top of the stack. The PC is then set to nnn.
        */
-      case (opcodes[0] & 0xf0) === 0x20:
+      case "CALL":
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
 
         // out of bounds gaurd
@@ -266,27 +375,41 @@ class Chip8 {
        * The interpreter compares register Vx to kk, and if they are equal, increments
        * the program counter by 2.
        */
-
-      case (opcodes[0] & 0xf0) === 0x30:
+      case "SE":
         if (this.V[opcodes[0] & 0x0f] === opcodes[1]) {
           this.PC += 2;
         }
         break;
 
       /**
-       * 6xkk - LD Vx, byte
-       * Set Vx = kk.
-       *
-       * The interpreter puts the value kk into register Vx.
+       * Load operations
        */
-      case (opcodes[0] & 0xf0) === 0x60:
-        // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+      case "LD":
+        if ((opcodes[0] & 0xf0) === 0x60) {
+          /**
+           * 6xkk - LD Vx, byte
+           * Set Vx = kk.
+           *
+           * The interpreter puts the value kk into register Vx.
+           */
+          // VF write gaurd
+          if ((opcodes[0] & 0x0f) === 0xf) {
+            throw new Error("(VF register is reserved, cannot perform write)");
+          }
 
-        this.V[opcodes[0] & 0x0f] = opcodes[1];
-        break;
+          this.V[opcodes[0] & 0x0f] = opcodes[1];
+          break;
+        } else if ((opcodes[0] & 0xf0) === 0xa0) {
+          /**
+           * Annn - LD I, addr
+           * Set I = nnn.
+           *
+           * The value of register I is set to nnn.
+           */
+          addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+          this.I = addr;
+          break;
+        }
 
       /**
        * 7xkk - ADD Vx, byte
@@ -294,24 +417,13 @@ class Chip8 {
        *
        * Adds the value kk to the value of register Vx, then stores the result in Vx.
        */
-      case (opcodes[0] & 0xf0) === 0x70:
+      case "ADD":
         // VF write gaurd
         if ((opcodes[0] & 0x0f) === 0xf) {
           throw new Error("(VF register is reserved, cannot perform write)");
         }
 
         this.V[opcodes[0] & 0x0f] += opcodes[1];
-        break;
-
-      /**
-       * Annn - LD I, addr
-       * Set I = nnn.
-       *
-       * The value of register I is set to nnn.
-       */
-      case (opcodes[0] & 0xf0) === 0xa0:
-        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
-        this.I = addr;
         break;
 
       /**
@@ -327,7 +439,7 @@ class Chip8 {
        * coordinates of the display, it wraps around to the opposite side of
        * the screen.
        */
-      case (opcodes[0] & 0xf0) === 0xd0:
+      case "DRW":
         let Vx = this.V[opcodes[0] & 0x0f];
         let Vy = this.V[(opcodes[1] & 0xf0) >> 0x4];
         let n = opcodes[1] & 0x0f;
@@ -436,10 +548,246 @@ class Chip8 {
   }
 }
 
-// Create a new instance of Chip8
+class Chip8Debugger {
+  constructor(chip8Instance) {
+    this.chip8 = chip8Instance;
+    this.vmemDump = document.querySelector("#vmem-dump");
+    this.heapDump = document.querySelector("#heap-dump");
+    this.regDump = document.querySelector("#reg-dump");
+    this.disassemblyDump = document.querySelector("#disass-dump");
+  }
+
+  updateVmemDump() {
+    this.updateElement(this.vmemDump, this.formatVmem());
+  }
+
+  updateHeapDump() {
+    this.updateElement(this.heapDump, this.formatHeap());
+  }
+
+  updateRegDump() {
+    this.updateElement(this.regDump, this.formatRegisters());
+  }
+
+  updateDisassembly() {
+    this.updateElement(this.disassemblyDump, this.formatDisassembly());
+  }
+
+  /**
+   * Signal update when text changes
+   * @param {Element} element
+   * @param {string} text
+   */
+  updateElement(element, text) {
+    element.classList.add("update-text");
+    setTimeout(() => element.classList.remove("update-text"), 500);
+    element.innerText = text;
+  }
+
+  /**
+   * Format vmem (frame buffer)
+   * format "offset: pixels[0-15] pixels[16-31]"
+   * @returns {string} - Formatted vmem
+   */
+  formatVmem() {
+    let dumpText = "";
+    for (let v = 0; v < this.chip8.frameBuffer.length; v += 32) {
+      dumpText += `  0x${("000" + v.toString(16)).slice(
+        -4
+      )}  ${this.chip8.frameBuffer
+        .slice(v, v + 16)
+        .join(" ")}  ${this.chip8.frameBuffer
+        .slice(v + 16, v + 32)
+        .join(" ")}\n`;
+    }
+    return dumpText;
+  }
+
+  /**
+   * Format heap
+   * format "addr: byte[0-7] byte[8-15] ascii"
+   * @returns {string} - Formatted heap
+   */
+  formatHeap() {
+    let dumpText = "";
+    for (let h = 0; h < this.chip8.memory.length; h += 16) {
+      let lHalf = Array.from(this.chip8.memory).slice(h, h + 8),
+        rHalf = Array.from(this.chip8.memory).slice(h + 8, h + 16);
+
+      dumpText += `  0x${("000" + h.toString(16)).slice(-4)}  ${lHalf
+        .map((i) => ("00" + i.toString(16)).slice(-2))
+        .join(" ")}  ${rHalf
+        .map((i) => ("00" + i.toString(16)).slice(-2))
+        .join(" ")}  ${lHalf
+        .concat(rHalf)
+        .map((i) => (i >= 0x20 && i <= 0x7e ? String.fromCharCode(i) : "."))
+        .join("")}\n`;
+    }
+    return dumpText;
+  }
+
+  /**
+   * Format registers
+   * format "v0-vf, i, pc, sp, delay, sound, stack"
+   * @returns {string} - Formatted registers
+   */
+  formatRegisters() {
+    return `${Array.from(this.chip8.V)
+      .map((v, i) => `  v${i.toString(16)} = 0x${v.toString(16)}`)
+      .join("\n")}\n\n  I = 0x${this.chip8.I.toString(
+      16
+    )}\n\n  PC = 0x${this.chip8.PC.toString(
+      16
+    )}\n  SP = 0x${this.chip8.SP.toString(
+      16
+    )}\n\n  delay = 0x${this.chip8.specialRegisters[0].toString(
+      16
+    )}\n  sound = 0x${this.chip8.specialRegisters[1].toString(
+      16
+    )}\n\n  stack\n${Array.from(this.chip8.stack)
+      .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
+      .join("")}`;
+  }
+
+  /**
+   * Disassemble rom
+   * format "offset: opcode[0-15] mnemonic operands"
+   * @returns {string} - Formatted disassembly
+   */
+  formatDisassembly() {
+    let dumpText = "";
+    for (let i = 0x200; i < 0xfff; i += 0x2) {
+      const { mnemonic, opcodes } = chip8.decode([
+        chip8.memory[i],
+        chip8.memory[i + 1],
+      ]);
+
+      switch (mnemonic) {
+        /**
+         * 0nnn - SYS nnn
+         */
+        case "SYS":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
+          break;
+
+        /**
+         * 00E0 - CLS
+         */
+        case "CLS":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
+          break;
+
+        /**
+         * 00EE - RET
+         */
+        case "RET":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
+          break;
+
+        /**
+         * 1nnn - JP nnn
+         */
+        case "JP":
+          dumpText += `  0x${("00" + i.toString(16)).slice(
+            -4
+          )}: ${mnemonic} 0x${(
+            ((opcodes[0] & 0x0f) << 8) +
+            opcodes[1]
+          ).toString(16)}\n`;
+          break;
+
+        /**
+         * 2nnn - CALL nnn
+         */
+        case "CALL":
+          dumpText += `  0x${("00" + i.toString(16)).slice(
+            -4
+          )}: ${mnemonic} 0x${(
+            ((opcodes[0] & 0x0f) << 8) +
+            opcodes[1]
+          ).toString(16)}\n`;
+          break;
+
+        /**
+         * 3xkk - SE Vx, kk
+         */
+        case "SE":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
+            opcodes[0] & 0x0f
+          }, 0x${opcodes[1].toString(16)}\n`;
+          break;
+
+        /**
+         * 6xkk - LD Vx, kk
+         * Annn - LD I, nnn
+         */
+        case "LD":
+          if ((opcodes[0] & 0xf0) === 0x60) {
+            dumpText += `  0x${("00" + i.toString(16)).slice(
+              -4
+            )}: ${mnemonic} v${opcodes[0] & 0x0f}, 0x${opcodes[1].toString(
+              16
+            )}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xa0) {
+            dumpText += `  0x${("00" + i.toString(16)).slice(
+              -4
+            )}: ${mnemonic} 0x${(
+              ((opcodes[0] & 0x0f) << 8) +
+              opcodes[1]
+            ).toString(16)}\n`;
+          }
+          break;
+
+        /**
+         * 7xkk - ADD Vx, kk
+         */
+        case "ADD":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
+            opcodes[0] & 0x0f
+          }, 0x${opcodes[1].toString(16)}\n`;
+          break;
+
+        /**
+         * Dxyn - DRW Vx, Vy, n
+         */
+        case "DRW":
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
+            opcodes[0] & 0x0f
+          }, v${(opcodes[1] & 0xf0) >> 0x4}, 0x${(opcodes[1] & 0x0f).toString(
+            16
+          )}\n`;
+          break;
+
+        /**
+         * Zero operations, end of program
+         */
+        case "ZERO":
+          return dumpText;
+
+        default:
+          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${(
+            "0" + opcodes[0].toString(16)
+          ).slice(-2)} ${("0" + opcodes[1].toString(16)).slice(
+            -2
+          )} (unmatched)\n`;
+          break;
+      }
+    }
+
+    return dumpText;
+  }
+
+  update() {
+    this.updateVmemDump();
+    this.updateHeapDump();
+    this.updateRegDump();
+    this.updateDisassembly();
+  }
+}
+
+// Create a new instance of Chip8 & Chip8Debugger
 const chip8 = new Chip8();
-console.log({ chip8 });
-let renderClock = 10;
+const chip8Debugger = new Chip8Debugger(chip8);
 let fpsText = document.querySelector(".display__stats__fps");
 
 /*
@@ -455,15 +803,10 @@ function setup() {
 
   background(0);
 
-  const dump = () => {
-    updateVmemDump();
-    updateHeapDump();
-    updateRegDump();
-  };
-
-  setTimeout(() => dump(), 100);
+  setTimeout(() => chip8Debugger.update(), 100);
+  // update every 10 seconds
   setInterval(() => {
-    dump();
+    chip8Debugger.update();
   }, 10 * 1000);
 }
 
@@ -471,97 +814,13 @@ function setup() {
  * p5 draw function
  */
 async function draw() {
-  if (frameCount % renderClock !== 0) {
+  if (frameCount % 10 !== 0) {
     fpsText.innerText = `${parseInt(frameRate(), 10)} FPS`;
   }
 
   background(0);
   !chip8.pixelStoke && noStroke();
   chip8.renderFrame();
-}
-
-/*
- * Entrypoint
- */
-async function main() {
-  let rom = await test_ibm();
-
-  // exec cycles
-  let cycles = 0;
-  let n = rom.length / 2;
-  let execute = setInterval(() => {
-    cycles++;
-    if (cycles === n) clearInterval(execute);
-    chip8.execute();
-  }, 0);
-}
-
-/**
- * Update vmem dump
- */
-async function updateVmemDump() {
-  let vmemDump = document.querySelector("#vmem-dump");
-
-  vmemDump.classList.add("update-text");
-  setTimeout(() => vmemDump.classList.remove("update-text"), 500);
-
-  vmemDump.innerText = ``;
-  for (let v = 0; v < chip8.frameBuffer.length; v += 32) {
-    vmemDump.innerText += `  0x${("00" + v.toString(16)).slice(
-      -3
-    )}  ${chip8.frameBuffer.slice(v, v + 16).join(" ")}  ${chip8.frameBuffer
-      .slice(v + 16, v + 32)
-      .join(" ")}\n`;
-  }
-}
-
-/**
- * Update heap dump
- */
-async function updateHeapDump() {
-  let heapDump = document.querySelector("#heap-dump");
-
-  heapDump.classList.add("update-text");
-  setTimeout(() => heapDump.classList.remove("update-text"), 500);
-
-  heapDump.innerText = ``;
-  for (let h = 0; h < chip8.memory.length; h += 16) {
-    let lHalf = Array.from(chip8.memory).slice(h, h + 8),
-      rHalf = Array.from(chip8.memory).slice(h + 8, h + 16);
-
-    heapDump.innerText += `  0x${("00" + h.toString(16)).slice(-3)}  ${lHalf
-      .map((i) => ("00" + i.toString(16)).slice(-2))
-      .join(" ")}  ${rHalf
-      .map((i) => ("00" + i.toString(16)).slice(-2))
-      .join(" ")}  ${lHalf
-      .concat(rHalf)
-      .map((i) => (i >= 0x20 && i <= 0x7e ? String.fromCharCode(i) : "."))
-      .join("")}\n`;
-  }
-}
-
-/**
- * Update reg dump
- */
-async function updateRegDump() {
-  let regDump = document.querySelector("#reg-dump");
-
-  regDump.classList.add("update-text");
-  setTimeout(() => regDump.classList.remove("update-text"), 500);
-
-  regDump.innerText = `${Array.from(chip8.V)
-    .map((v, i) => `  v${i.toString(16)} = 0x${v.toString(16)}`)
-    .join("\n")}\n\n  I = 0x${chip8.I.toString(
-    16
-  )}\n\n  PC = 0x${chip8.PC.toString(16)}\n  SP = 0x${chip8.SP.toString(
-    16
-  )}\n\n  delay = 0x${chip8.specialRegisters[0].toString(
-    16
-  )}\n  sound = 0x${chip8.specialRegisters[1].toString(
-    16
-  )}\n\n  stack\n${Array.from(chip8.stack)
-    .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
-    .join("")}`;
 }
 
 /**
@@ -628,8 +887,13 @@ async function test_draw() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
+    // invalid opcode
+    0x99, 0x11,
+    // JMP 0x202
+    0x12, 0x02,
   ];
   chip8.loadROM(rom);
+  return rom;
 }
 
 async function test_jmp() {
@@ -657,6 +921,27 @@ async function test_jmp() {
   ];
   chip8.loadROM(rom);
   return rom;
+}
+
+/*
+ * Entrypoint
+ */
+async function main() {
+  let rom = await test_ibm();
+
+  // chip8.execute();
+  // chip8.execute();
+  // chip8.execute();
+  // chip8.execute();
+  // chip8.execute();
+
+  let cycles = 0;
+  let n = rom.length / 2;
+  let execute = setInterval(() => {
+    cycles++;
+    if (cycles === n) clearInterval(execute);
+    chip8.execute();
+  }, 0);
 }
 
 main();
