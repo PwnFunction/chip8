@@ -34,6 +34,10 @@ body {
   border: 4px solid #333;
 }
 
+button {
+  cursor: pointer;
+}
+
 .rom {
   height: 100vh;
   display: grid;

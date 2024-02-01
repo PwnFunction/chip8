@@ -651,7 +651,7 @@ class Chip8Debugger {
 
   /**
    * Disassemble rom
-   * format "offset: opcode[0-15] mnemonic operands"
+   * format "addr: opcode[0-7] opcode[8-15] mnemonic"
    * @returns {string} - Formatted disassembly
    */
   formatDisassembly() {
@@ -662,35 +662,27 @@ class Chip8Debugger {
         chip8.memory[i + 1],
       ]);
 
+      dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${(
+        "0" + opcodes[0].toString(16)
+      ).slice(-2)} ${("0" + opcodes[1].toString(16)).slice(-2)}  `;
+
       switch (mnemonic) {
         /**
          * 0nnn - SYS nnn
-         */
-        case "SYS":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
-          break;
-
-        /**
          * 00E0 - CLS
-         */
-        case "CLS":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
-          break;
-
-        /**
          * 00EE - RET
          */
+        case "SYS":
+        case "CLS":
         case "RET":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic}\n`;
+          dumpText += `${mnemonic}\n`;
           break;
 
         /**
          * 1nnn - JP nnn
          */
         case "JP":
-          dumpText += `  0x${("00" + i.toString(16)).slice(
-            -4
-          )}: ${mnemonic} 0x${(
+          dumpText += `${mnemonic} 0x${(
             ((opcodes[0] & 0x0f) << 8) +
             opcodes[1]
           ).toString(16)}\n`;
@@ -700,9 +692,7 @@ class Chip8Debugger {
          * 2nnn - CALL nnn
          */
         case "CALL":
-          dumpText += `  0x${("00" + i.toString(16)).slice(
-            -4
-          )}: ${mnemonic} 0x${(
+          dumpText += `${mnemonic} 0x${(
             ((opcodes[0] & 0x0f) << 8) +
             opcodes[1]
           ).toString(16)}\n`;
@@ -712,7 +702,7 @@ class Chip8Debugger {
          * 3xkk - SE Vx, kk
          */
         case "SE":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
+          dumpText += `${mnemonic} v${
             opcodes[0] & 0x0f
           }, 0x${opcodes[1].toString(16)}\n`;
           break;
@@ -723,15 +713,11 @@ class Chip8Debugger {
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
-            dumpText += `  0x${("00" + i.toString(16)).slice(
-              -4
-            )}: ${mnemonic} v${opcodes[0] & 0x0f}, 0x${opcodes[1].toString(
-              16
-            )}\n`;
+            dumpText += `${mnemonic} v${
+              opcodes[0] & 0x0f
+            }, 0x${opcodes[1].toString(16)}\n`;
           } else if ((opcodes[0] & 0xf0) === 0xa0) {
-            dumpText += `  0x${("00" + i.toString(16)).slice(
-              -4
-            )}: ${mnemonic} 0x${(
+            dumpText += `${mnemonic} 0x${(
               ((opcodes[0] & 0x0f) << 8) +
               opcodes[1]
             ).toString(16)}\n`;
@@ -742,7 +728,7 @@ class Chip8Debugger {
          * 7xkk - ADD Vx, kk
          */
         case "ADD":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
+          dumpText += `${mnemonic} v${
             opcodes[0] & 0x0f
           }, 0x${opcodes[1].toString(16)}\n`;
           break;
@@ -751,11 +737,9 @@ class Chip8Debugger {
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${mnemonic} v${
-            opcodes[0] & 0x0f
-          }, v${(opcodes[1] & 0xf0) >> 0x4}, 0x${(opcodes[1] & 0x0f).toString(
-            16
-          )}\n`;
+          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+            (opcodes[1] & 0xf0) >> 0x4
+          }, 0x${(opcodes[1] & 0x0f).toString(16)}\n`;
           break;
 
         /**
@@ -765,11 +749,9 @@ class Chip8Debugger {
           return dumpText;
 
         default:
-          dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${(
-            "0" + opcodes[0].toString(16)
-          ).slice(-2)} ${("0" + opcodes[1].toString(16)).slice(
-            -2
-          )} (unmatched)\n`;
+          dumpText += `${("0" + opcodes[0].toString(16)).slice(-2)} ${(
+            "0" + opcodes[1].toString(16)
+          ).slice(-2)} (U)\n`; // mark unmatched
           break;
       }
     }
@@ -777,6 +759,10 @@ class Chip8Debugger {
     return dumpText;
   }
 
+  /**
+   * Update all debugger elements
+   * @returns {void}
+   */
   update() {
     this.updateVmemDump();
     this.updateHeapDump();
