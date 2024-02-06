@@ -1005,7 +1005,9 @@ class Chip8Debugger {
     if (!this.started) {
       this.started = true;
     }
+    this.chip8.halt = false;
     this.chip8.execute();
+    this.chip8.halt = true;
     this.update();
   }
 
