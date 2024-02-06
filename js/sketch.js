@@ -246,6 +246,16 @@ class Chip8 {
         return { mnemonic: "SNE", opcodes };
 
       /**
+       * 5xy0 - SE Vx, Vy
+       * Skip next instruction if Vx = Vy.
+       *
+       * The interpreter compares register Vx to register Vy, and if they are equal,
+       * increments the program counter by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x50 && (opcodes[1] & 0x0f) === 0x0:
+        return { mnemonic: "SE", opcodes };
+
+      /**
        * 6xkk - LD Vx, byte
        * Set Vx = kk.
        *
@@ -385,14 +395,33 @@ class Chip8 {
 
       /**
        * 3xkk - SE Vx, byte
-       * Skip next instruction if Vx = kk.
-       *
-       * The interpreter compares register Vx to kk, and if they are equal, increments
-       * the program counter by 2.
+       * 5xy0 - SE Vx, Vy
        */
       case "SE":
-        if (this.V[opcodes[0] & 0x0f] === opcodes[1]) {
-          this.PC += 2;
+        if ((opcodes[0] & 0xf0) === 0x30) {
+          /**
+           * 3xkk - SE Vx, byte
+           * Skip next instruction if Vx = kk.
+           *
+           * The interpreter compares register Vx to kk, and if they are equal, increments
+           * the program counter by 2.
+           */
+          if (this.V[opcodes[0] & 0x0f] === opcodes[1]) {
+            this.PC += 2;
+          }
+        } else if ((opcodes[0] & 0xf0) === 0x50) {
+          /**
+           * 5xy0 - SE Vx, Vy
+           * Skip next instruction if Vx = Vy.
+           *
+           * The interpreter compares register Vx to register Vy, and if they are equal,
+           * increments the program counter by 2.
+           */
+          if (
+            this.V[opcodes[0] & 0x0f] === this.V[(opcodes[1] & 0xf0) >> 0x4]
+          ) {
+            this.PC += 2;
+          }
         }
         break;
 
@@ -688,7 +717,9 @@ class Chip8Debugger {
       16
     )}\n\n  stack\n${Array.from(this.chip8.stack)
       .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
-      .join("")}`;
+      .join("")}\n  state: ${
+      this.chip8.halt ? "halt" : this.started ? "running" : "idle"
+    }\n\n`;
   }
 
   /**
@@ -744,11 +775,18 @@ class Chip8Debugger {
 
         /**
          * 3xkk - SE Vx, kk
+         * 5xy0 - SE Vx, Vy
          */
         case "SE":
-          dumpText += `${mnemonic} v${
-            opcodes[0] & 0x0f
-          }, 0x${opcodes[1].toString(16)}\n`;
+          if ((opcodes[0] & 0xf0) === 0x30) {
+            dumpText += `${mnemonic} v${
+              opcodes[0] & 0x0f
+            }, 0x${opcodes[1].toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0x50) {
+            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+              (opcodes[1] & 0xf0) >> 0x4
+            }\n`;
+          }
           break;
 
         /**
@@ -817,6 +855,9 @@ class Chip8Debugger {
    * @returns {void}
    */
   stepInstruction() {
+    if (!this.started) {
+      this.started = true;
+    }
     this.chip8.execute();
     this.update();
   }
@@ -971,9 +1012,11 @@ async function test_draw() {
     // DRW V2, V3, 5
     0xd2, 0x35,
     // SNE V4, 0x04
-    0x44, 0x01,
+    0x44, 0x00,
+    // SE V2, V3
+    0x52, 0x60,
     // JMP 0x202
-    0x12, 0x0c,
+    0x12, 0x0e,
   ];
   chip8.loadROM(rom);
   return rom;
