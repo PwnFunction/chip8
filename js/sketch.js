@@ -151,6 +151,9 @@ class Chip8 {
       ]),
       0x50
     );
+
+    // halt execution
+    this.halt = false;
   }
 
   /**
@@ -233,6 +236,16 @@ class Chip8 {
         return { mnemonic: "SE", opcodes };
 
       /**
+       * 4xkk - SNE Vx, byte
+       * Skip next instruction if Vx != kk.
+       *
+       * The interpreter compares register Vx to kk, and if they are not equal, increments
+       * the program counter by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x40:
+        return { mnemonic: "SNE", opcodes };
+
+      /**
        * 6xkk - LD Vx, byte
        * Set Vx = kk.
        *
@@ -285,10 +298,12 @@ class Chip8 {
    * Executes one instruction
    */
   execute() {
-    /**
-     * Fetch 2 bytes (2 half instructions)
-     */
+    // halt execution
+    if (this.halt) {
+      return;
+    }
 
+    // Fetch 2 bytes (2 half instructions)
     const opcodes = this.fetch();
     const { mnemonic } = this.decode(opcodes);
 
@@ -382,6 +397,19 @@ class Chip8 {
         break;
 
       /**
+       * 4xkk - SNE Vx, byte
+       * Skip next instruction if Vx != kk.
+       *
+       * The interpreter compares register Vx to kk, and if they are not equal, increments
+       * the program counter by 2.
+       */
+      case "SNE":
+        if (this.V[opcodes[0] & 0x0f] !== opcodes[1]) {
+          this.PC += 2;
+        }
+        break;
+
+      /**
        * Load operations
        */
       case "LD":
@@ -462,6 +490,15 @@ class Chip8 {
           }
         }
 
+        break;
+
+      /**
+       * Zero operations
+       */
+      case "ZERO":
+        // halt execution
+        this.halt = true;
+        this.PC -= 2;
         break;
 
       /**
@@ -715,6 +752,15 @@ class Chip8Debugger {
           break;
 
         /**
+         * 4xkk - SNE Vx, kk
+         */
+        case "SNE":
+          dumpText += `${mnemonic} v${
+            opcodes[0] & 0x0f
+          }, 0x${opcodes[1].toString(16)}\n`;
+          break;
+
+        /**
          * 6xkk - LD Vx, kk
          * Annn - LD I, nnn
          */
@@ -786,8 +832,8 @@ class Chip8Debugger {
 
     this.executionInterval = await setInterval(() => {
       this.chip8.execute();
-      if (this.chip8.PC === 0xfff) {
-        clearInterval(interval);
+      if (this.chip8.PC >= 0xfff) {
+        clearInterval(this.executionInterval);
       }
     }, this.cpuClock);
   }
@@ -924,10 +970,10 @@ async function test_draw() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
-    // invalid opcode
-    0x99, 0x11,
+    // SNE V4, 0x04
+    0x44, 0x01,
     // JMP 0x202
-    0x12, 0x02,
+    0x12, 0x0c,
   ];
   chip8.loadROM(rom);
   return rom;
@@ -964,7 +1010,7 @@ async function test_jmp() {
  * Entrypoint
  */
 async function main() {
-  await test_ibm();
+  await test_draw();
 }
 
 main();
