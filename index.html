@@ -12,7 +12,7 @@
         <canvas id="display"></canvas>
         <div class="display__stats">
           <span class="display__stats__fps">FPS</span>
-          <button onclick="chip8.clearFrameBuffer()">cls</button>
+          <button onclick="chip8.clearFrameBuffer()">clear</button>
         </div>
       </div>
 
@@ -22,6 +22,24 @@
           <span>DISASSEMBLY</span>
           <button id="refresh" onclick="chip8Debugger.updateDisassembly()">
             refresh
+          </button>
+          <button
+            onclick="chip8Debugger.continueExecution(); this.innerText = chip8Debugger.started ? 'continue':'start'"
+          >
+            start
+          </button>
+          <button onclick="chip8Debugger.stepInstruction()">
+            step instruction
+          </button>
+          <button
+            onclick="chip8Debugger.started && chip8Debugger.stopExecution();"
+          >
+            stop
+          </button>
+          <button
+            onclick="chip8Debugger.toggleAutoUpdate(); this.innerText = chip8Debugger.autoUpdate ? 'auto update is on' : 'auto update is off'"
+          >
+            auto update is on
           </button>
         </div>
         <pre><code id="disass-dump"></code></pre>

@@ -555,6 +555,11 @@ class Chip8Debugger {
     this.heapDump = document.querySelector("#heap-dump");
     this.regDump = document.querySelector("#reg-dump");
     this.disassemblyDump = document.querySelector("#disass-dump");
+    this.autoUpdate = true;
+
+    this.cpuClock = 0;
+    this.executionInterval = null;
+    this.started = false;
   }
 
   updateVmemDump() {
@@ -662,9 +667,11 @@ class Chip8Debugger {
         chip8.memory[i + 1],
       ]);
 
-      dumpText += `  0x${("00" + i.toString(16)).slice(-4)}: ${(
-        "0" + opcodes[0].toString(16)
-      ).slice(-2)} ${("0" + opcodes[1].toString(16)).slice(-2)}  `;
+      dumpText += ` ${chip8.PC === i ? ">" : " "} 0x${(
+        "00" + i.toString(16)
+      ).slice(-4)}: ${("0" + opcodes[0].toString(16)).slice(-2)} ${(
+        "0" + opcodes[1].toString(16)
+      ).slice(-2)}  `;
 
       switch (mnemonic) {
         /**
@@ -717,7 +724,7 @@ class Chip8Debugger {
               opcodes[0] & 0x0f
             }, 0x${opcodes[1].toString(16)}\n`;
           } else if ((opcodes[0] & 0xf0) === 0xa0) {
-            dumpText += `${mnemonic} 0x${(
+            dumpText += `${mnemonic} I, 0x${(
               ((opcodes[0] & 0x0f) << 8) +
               opcodes[1]
             ).toString(16)}\n`;
@@ -760,10 +767,52 @@ class Chip8Debugger {
   }
 
   /**
+   * Step through one instruction
+   * @returns {void}
+   */
+  stepInstruction() {
+    this.chip8.execute();
+    this.update();
+  }
+
+  /**
+   * Continue execution
+   * @returns {void}
+   */
+  async continueExecution() {
+    if (!this.started) {
+      this.started = true;
+    }
+
+    this.executionInterval = await setInterval(() => {
+      this.chip8.execute();
+      if (this.chip8.PC === 0xfff) {
+        clearInterval(interval);
+      }
+    }, this.cpuClock);
+  }
+
+  /**
+   * Stop execution
+   * @returns {void}
+   */
+  async stopExecution() {
+    clearInterval(this.executionInterval);
+  }
+
+  /**
+   * Toggle auto update
+   * @returns {void}
+   */
+  toggleAutoUpdate() {
+    this.autoUpdate = !this.autoUpdate;
+  }
+
+  /**
    * Update all debugger elements
    * @returns {void}
    */
-  update() {
+  async update() {
     this.updateVmemDump();
     this.updateHeapDump();
     this.updateRegDump();
@@ -792,7 +841,9 @@ function setup() {
   setTimeout(() => chip8Debugger.update(), 100);
   // update every 10 seconds
   setInterval(() => {
-    chip8Debugger.update();
+    if (chip8Debugger.autoUpdate) {
+      chip8Debugger.update();
+    }
   }, 10 * 1000);
 }
 
@@ -913,21 +964,7 @@ async function test_jmp() {
  * Entrypoint
  */
 async function main() {
-  let rom = await test_ibm();
-
-  // chip8.execute();
-  // chip8.execute();
-  // chip8.execute();
-  // chip8.execute();
-  // chip8.execute();
-
-  let cycles = 0;
-  let n = rom.length / 2;
-  let execute = setInterval(() => {
-    cycles++;
-    if (cycles === n) clearInterval(execute);
-    chip8.execute();
-  }, 0);
+  await test_ibm();
 }
 
 main();
