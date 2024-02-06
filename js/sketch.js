@@ -265,6 +265,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * 8xy0 - LD Vx, Vy
+       * Set Vx = Vy.
+       *
+       * Stores the value of register Vy in register Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x0:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -453,9 +462,7 @@ class Chip8 {
           if ((opcodes[0] & 0x0f) === 0xf) {
             throw new Error("(VF register is reserved, cannot perform write)");
           }
-
           this.V[opcodes[0] & 0x0f] = opcodes[1];
-          break;
         } else if ((opcodes[0] & 0xf0) === 0xa0) {
           /**
            * Annn - LD I, addr
@@ -465,8 +472,24 @@ class Chip8 {
            */
           addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
           this.I = addr;
-          break;
+        } else if (
+          (opcodes[0] & 0xf0) === 0x80 &&
+          (opcodes[1] & 0x0f) === 0x0
+        ) {
+          /**
+           * 8xy0 - LD Vx, Vy
+           * Set Vx = Vy.
+           *
+           * Stores the value of register Vy in register Vx.
+           */
+          // VF write gaurd
+          if ((opcodes[0] & 0x0f) === 0xf) {
+            throw new Error("(VF register is reserved, cannot perform write)");
+          }
+          this.V[opcodes[0] & 0x0f] = this.V[(opcodes[1] & 0xf0) >> 0x4];
         }
+
+        break;
 
       /**
        * 7xkk - ADD Vx, byte
@@ -812,6 +835,13 @@ class Chip8Debugger {
               ((opcodes[0] & 0x0f) << 8) +
               opcodes[1]
             ).toString(16)}\n`;
+          } else if (
+            (opcodes[0] & 0xf0) === 0x80 &&
+            (opcodes[1] & 0x0f) === 0x0
+          ) {
+            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+              (opcodes[1] & 0xf0) >> 0x4
+            }\n`;
           }
           break;
 
@@ -1005,18 +1035,14 @@ async function test_draw() {
     0x00, 0xe0,
     // LD V2, 0x04
     0x62, 0x04,
-    // LD V3, 0x04
-    0x63, 0x04,
+    // LD V3, V2
+    0x83, 0x20,
     // LD I, 0x50
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
-    // SNE V4, 0x04
-    0x44, 0x00,
-    // SE V2, V3
-    0x52, 0x60,
     // JMP 0x202
-    0x12, 0x0e,
+    0x12, 0x0a,
   ];
   chip8.loadROM(rom);
   return rom;
