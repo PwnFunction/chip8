@@ -296,6 +296,18 @@ class Chip8 {
         return { mnemonic: "AND", opcodes };
 
       /**
+       * 8xy3 - XOR Vx, Vy
+       * Set Vx = Vx XOR Vy.
+       *
+       * Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result
+       * in Vx. An exclusive OR compares the corrseponding bits from two values, and if the
+       * bits are not both the same, then the corresponding bit in the result is set to 1.
+       * Otherwise, it is 0.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x3:
+        return { mnemonic: "XOR", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -560,6 +572,24 @@ class Chip8 {
         }
 
         this.V[opcodes[0] & 0x0f] &= this.V[(opcodes[1] & 0xf0) >> 0x4];
+        break;
+
+      /**
+       * 8xy3 - XOR Vx, Vy
+       * Set Vx = Vx XOR Vy.
+       *
+       * Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result
+       * in Vx. An exclusive OR compares the corrseponding bits from two values, and if the
+       * bits are not both the same, then the corresponding bit in the result is set to 1.
+       * Otherwise, it is 0.
+       */
+      case "XOR":
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          throw new Error("(VF register is reserved, cannot perform write)");
+        }
+
+        this.V[opcodes[0] & 0x0f] ^= this.V[(opcodes[1] & 0xf0) >> 0x4];
         break;
 
       /**
@@ -933,6 +963,15 @@ class Chip8Debugger {
           break;
 
         /**
+         * 8xy3 - XOR Vx, Vy
+         */
+        case "XOR":
+          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+            (opcodes[1] & 0xf0) >> 0x4
+          }\n`;
+          break;
+
+        /**
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
@@ -1119,12 +1158,12 @@ async function test_draw() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
-    // LD V4, 0x5
-    0x64, 0x05,
-    // LD V5, 0x4
-    0x65, 0x04,
-    // AND V4, V5
-    0x84, 0x52,
+    // LD V4, 0x07
+    0x64, 0x07,
+    // LD V5, 0x02
+    0x65, 0x02,
+    // XOR V4, V5
+    0x84, 0x53,
     // JMP
     0x12, 0x10,
   ];
