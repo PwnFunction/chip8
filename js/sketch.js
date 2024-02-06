@@ -274,6 +274,17 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * 8xy1 - OR Vx, Vy
+       * Set Vx = Vx OR Vy.
+       *
+       * Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx.
+       * A bitwise OR compares the corrseponding bits from two values, and if either bit
+       * is 1, then the same bit in the result is also 1. Otherwise, it is 0.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x1:
+        return { mnemonic: "OR", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -507,6 +518,23 @@ class Chip8 {
         break;
 
       /**
+       * 8xy1 - OR Vx, Vy
+       * Set Vx = Vx OR Vy.
+       *
+       * Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx.
+       * A bitwise OR compares the corrseponding bits from two values, and if either bit
+       * is 1, then the same bit in the result is also 1. Otherwise, it is 0.
+       */
+      case "OR":
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          throw new Error("(VF register is reserved, cannot perform write)");
+        }
+
+        this.V[opcodes[0] & 0x0f] |= this.V[(opcodes[1] & 0xf0) >> 0x4];
+        break;
+
+      /**
        * Dxyn - DRW Vx, Vy, nibble
        * Display n-byte sprite starting at memory location I at (Vx, Vy),
        * set VF = collision.
@@ -557,7 +585,11 @@ class Chip8 {
        * Invalid opcode
        */
       default:
-        throw new Error("invalid opcode");
+        throw new Error(
+          `invalid opcode (0x${opcodes[0].toString(
+            16
+          )}, 0x${opcodes[1].toString(16)})`
+        );
     }
   }
 
@@ -824,6 +856,7 @@ class Chip8Debugger {
         /**
          * 6xkk - LD Vx, kk
          * Annn - LD I, nnn
+         * 8xy0 - LD Vx, Vy
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
@@ -852,6 +885,15 @@ class Chip8Debugger {
           dumpText += `${mnemonic} v${
             opcodes[0] & 0x0f
           }, 0x${opcodes[1].toString(16)}\n`;
+          break;
+
+        /**
+         * 8xy1 - OR Vx, Vy
+         */
+        case "OR":
+          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+            (opcodes[1] & 0xf0) >> 0x4
+          }\n`;
           break;
 
         /**
@@ -1041,8 +1083,14 @@ async function test_draw() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
-    // JMP 0x202
-    0x12, 0x0a,
+    // LD V4, 0x5
+    0x64, 0x05,
+    // LD V5, 0x2
+    0x65, 0x02,
+    // OR V4, V5
+    0x84, 0x51,
+    // JMP
+    0x12, 0x10,
   ];
   chip8.loadROM(rom);
   return rom;
