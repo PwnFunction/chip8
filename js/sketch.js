@@ -285,6 +285,17 @@ class Chip8 {
         return { mnemonic: "OR", opcodes };
 
       /**
+       * 8xy2 - AND Vx, Vy
+       * Set Vx = Vx AND Vy.
+       *
+       * Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
+       * A bitwise AND compares the corrseponding bits from two values, and if both bits
+       * are 1, then the same bit in the result is also 1. Otherwise, it is 0.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x2:
+        return { mnemonic: "AND", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -535,6 +546,23 @@ class Chip8 {
         break;
 
       /**
+       * 8xy2 - AND Vx, Vy
+       * Set Vx = Vx AND Vy.
+       *
+       * Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
+       * A bitwise AND compares the corrseponding bits from two values, and if both bits
+       * are 1, then the same bit in the result is also 1. Otherwise, it is 0.
+       */
+      case "AND":
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          throw new Error("(VF register is reserved, cannot perform write)");
+        }
+
+        this.V[opcodes[0] & 0x0f] &= this.V[(opcodes[1] & 0xf0) >> 0x4];
+        break;
+
+      /**
        * Dxyn - DRW Vx, Vy, nibble
        * Display n-byte sprite starting at memory location I at (Vx, Vy),
        * set VF = collision.
@@ -569,7 +597,6 @@ class Chip8 {
             }
           }
         }
-
         break;
 
       /**
@@ -897,6 +924,15 @@ class Chip8Debugger {
           break;
 
         /**
+         * 8xy2 - AND Vx, Vy
+         */
+        case "AND":
+          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+            (opcodes[1] & 0xf0) >> 0x4
+          }\n`;
+          break;
+
+        /**
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
@@ -1085,10 +1121,10 @@ async function test_draw() {
     0xd2, 0x35,
     // LD V4, 0x5
     0x64, 0x05,
-    // LD V5, 0x2
-    0x65, 0x02,
-    // OR V4, V5
-    0x84, 0x51,
+    // LD V5, 0x4
+    0x65, 0x04,
+    // AND V4, V5
+    0x84, 0x52,
     // JMP
     0x12, 0x10,
   ];
