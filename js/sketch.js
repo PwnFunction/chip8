@@ -308,6 +308,17 @@ class Chip8 {
         return { mnemonic: "XOR", opcodes };
 
       /**
+       * 8xy4 - ADD Vx, Vy
+       * Set Vx = Vx + Vy, set VF = carry.
+       *
+       * The values of Vx and Vy are added together. If the result is greater than 8 bits
+       * (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result
+       * are kept, and stored in Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x4:
+        return { mnemonic: "ADD", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -526,18 +537,38 @@ class Chip8 {
         break;
 
       /**
-       * 7xkk - ADD Vx, byte
-       * Set Vx = Vx + kk.
-       *
-       * Adds the value kk to the value of register Vx, then stores the result in Vx.
+       * Add operations
        */
       case "ADD":
         // VF write gaurd
         if ((opcodes[0] & 0x0f) === 0xf) {
           throw new Error("(VF register is reserved, cannot perform write)");
         }
-
-        this.V[opcodes[0] & 0x0f] += opcodes[1];
+        if ((opcodes[0] & 0xf0) === 0x70) {
+          /**
+           * 7xkk - ADD Vx, byte
+           * Set Vx = Vx + kk.
+           *
+           * Adds the value kk to the value of register Vx, then stores the result in Vx.
+           */
+          this.V[opcodes[0] & 0x0f] += opcodes[1];
+        } else if (
+          (opcodes[0] & 0xf0) === 0x80 &&
+          (opcodes[1] & 0x0f) === 0x4
+        ) {
+          /**
+           * 8xy4 - ADD Vx, Vy
+           * Set Vx = Vx + Vy, set VF = carry.
+           *
+           * The values of Vx and Vy are added together. If the result is greater than 8 bits
+           * (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result
+           * are kept, and stored in Vx.
+           */
+          let sum =
+            this.V[opcodes[0] & 0x0f] + this.V[(opcodes[1] & 0xf0) >> 0x4];
+          this.V[opcodes[0] & 0x0f] = sum & 0xff;
+          this.V[0xf] = sum > 0xff ? 1 : 0;
+        }
         break;
 
       /**
@@ -937,11 +968,21 @@ class Chip8Debugger {
 
         /**
          * 7xkk - ADD Vx, kk
+         * 8xy4 - ADD Vx, Vy
          */
         case "ADD":
-          dumpText += `${mnemonic} v${
-            opcodes[0] & 0x0f
-          }, 0x${opcodes[1].toString(16)}\n`;
+          if ((opcodes[0] & 0xf0) === 0x70) {
+            dumpText += `${mnemonic} v${
+              opcodes[0] & 0x0f
+            }, 0x${opcodes[1].toString(16)}\n`;
+          } else if (
+            (opcodes[0] & 0xf0) === 0x80 &&
+            (opcodes[1] & 0x0f) === 0x4
+          ) {
+            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
+              (opcodes[1] & 0xf0) >> 0x4
+            }\n`;
+          }
           break;
 
         /**
@@ -1110,47 +1151,6 @@ async function test_ibm() {
   return rom;
 }
 
-async function test_program() {
-  // 00E0 - CLS
-  chip8.memory[0x200] = 0x00;
-  chip8.memory[0x201] = 0xe0;
-
-  // 1nnn - JMP addr
-  // JMP 0x234 - big endian
-  chip8.memory[0x202] = 0x12;
-  chip8.memory[0x203] = 0x04;
-
-  // 6xkk - LD Vx, byte
-  // LD V0, 0xde
-  chip8.memory[0x204] = 0x60;
-  chip8.memory[0x205] = 0xde;
-
-  // 7xkk - ADD Vx, byte
-  // ADD V1, 0xad
-  chip8.memory[0x206] = 0x71;
-  chip8.memory[0x207] = 0xad;
-
-  // Annn - LD I, addr
-  // LD I, 0x211
-  chip8.memory[0x208] = 0xa2;
-  chip8.memory[0x209] = 0x11;
-
-  // DRAW '0'
-  // set V2 to 4
-  chip8.memory[0x20a] = 0x62;
-  chip8.memory[0x20b] = 0x04;
-  // set V3 to 4
-  chip8.memory[0x20c] = 0x63;
-  chip8.memory[0x20d] = 0x04;
-  // set I to 0x50
-  chip8.memory[0x20e] = 0xa0;
-  chip8.memory[0x20f] = 0x50;
-  // Dxyn - DRW Vx, Vy, nibble
-  // DRW V2, V3, 5
-  chip8.memory[0x210] = 0xd2;
-  chip8.memory[0x211] = 0x35;
-}
-
 async function test_draw() {
   let rom = [
     // CLS
@@ -1163,41 +1163,27 @@ async function test_draw() {
     0xa0, 0x50,
     // DRW V2, V3, 5
     0xd2, 0x35,
+    // JMP
+    0x12, 0x0a,
+  ];
+  chip8.loadROM(rom);
+  return rom;
+}
+
+async function test_generic() {
+  let rom = [
     // LD V4, 0x07
     0x64, 0x07,
     // LD V5, 0x02
     0x65, 0x02,
     // XOR V4, V5
     0x84, 0x53,
+    // ADD V4, 0x03
+    0x74, 0x03,
+    // ADD V4, V5
+    0x84, 0x54,
     // JMP
-    0x12, 0x10,
-  ];
-  chip8.loadROM(rom);
-  return rom;
-}
-
-async function test_jmp() {
-  let rom = [
-    0x00,
-    0xe0, // 0x200 CLS
-
-    0x12,
-    0x0c, // 0x202 JMP 0x20c
-
-    0x60,
-    0x04, // 0x204 LD V0, 0x4
-
-    0x61,
-    0x04, // 0x206 LD V1, 0x4
-
-    0xd0,
-    0x15, // 0x208 DRW V0, V1, 5
-
-    0x00,
-    0xee, // 0x20a RET
-
-    0x22,
-    0x04, // 0x20c CALL 0x204
+    0x12, 0x0a,
   ];
   chip8.loadROM(rom);
   return rom;
@@ -1207,7 +1193,7 @@ async function test_jmp() {
  * Entrypoint
  */
 async function main() {
-  await test_draw();
+  await test_generic();
 }
 
 main();
