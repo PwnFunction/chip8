@@ -23,18 +23,15 @@
           <button id="refresh" onclick="chip8Debugger.updateDisassembly()">
             refresh
           </button>
+
           <button
-            onclick="chip8Debugger.continueExecution(); this.innerText = chip8Debugger.started ? 'continue':'start'"
+            onclick="if(!chip8Debugger.started) { chip8Debugger.continueExecution(); this.innerText = 'stop'; } else if (chip8Debugger.started && !chip8.halt) { chip8Debugger.stopExecution(); this.innerText = 'continue'; } else if (chip8Debugger.started && chip8.halt) { chip8Debugger.continueExecution(); this.innerText = 'stop'; }"
           >
             start
           </button>
+
           <button onclick="chip8Debugger.stepInstruction()">
             step instruction
-          </button>
-          <button
-            onclick="chip8Debugger.started && chip8Debugger.stopExecution();"
-          >
-            stop
           </button>
           <button
             onclick="chip8Debugger.toggleAutoUpdate(); this.innerText = chip8Debugger.autoUpdate ? 'auto update is on' : 'auto update is off'"

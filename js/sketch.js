@@ -1018,6 +1018,8 @@ class Chip8Debugger {
       this.started = true;
     }
 
+    this.chip8.halt = false;
+
     this.executionInterval = await setInterval(() => {
       this.chip8.execute();
       if (this.chip8.PC >= 0xfff) {
@@ -1032,6 +1034,7 @@ class Chip8Debugger {
    */
   async stopExecution() {
     clearInterval(this.executionInterval);
+    this.chip8.halt = true;
   }
 
   /**
@@ -1150,8 +1153,8 @@ async function test_draw() {
   let rom = [
     // CLS
     0x00, 0xe0,
-    // LD V2, 0x04
-    0x62, 0x04,
+    // LD V2, 0x0b
+    0x62, 0x0b,
     // LD V3, V2
     0x83, 0x20,
     // LD I, 0x50
