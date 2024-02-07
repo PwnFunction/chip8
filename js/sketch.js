@@ -362,6 +362,16 @@ class Chip8 {
         return { mnemonic: "SHL", opcodes };
 
       /**
+       * 9xy0 - SNE Vx, Vy
+       * Skip next instruction if Vx != Vy.
+       *
+       * The values of Vx and Vy are compared, and if they are not equal, the program
+       * counter is increased by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x90 && (opcodes[1] & 0x0f) === 0x0:
+        return { mnemonic: "SNE", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -491,6 +501,7 @@ class Chip8 {
         break;
 
       /**
+       * Skip operations
        * 3xkk - SE Vx, byte
        * 5xy0 - SE Vx, Vy
        */
@@ -523,20 +534,43 @@ class Chip8 {
         break;
 
       /**
+       * Skip operations
        * 4xkk - SNE Vx, byte
-       * Skip next instruction if Vx != kk.
-       *
-       * The interpreter compares register Vx to kk, and if they are not equal, increments
-       * the program counter by 2.
+       * 9xy0 - SNE Vx, Vy
        */
       case "SNE":
-        if (this.V[opcodes[0] & 0x0f] !== opcodes[1]) {
-          this.PC += 2;
+        if ((opcodes[0] & 0xf0) === 0x90 && (opcodes[1] & 0x0f) === 0x0) {
+          /**
+           * 9xy0 - SNE Vx, Vy
+           * Skip next instruction if Vx != Vy.
+           *
+           * The values of Vx and Vy are compared, and if they are not equal, the program
+           * counter is increased by 2.
+           */
+          if (
+            this.V[opcodes[0] & 0x0f] !== this.V[(opcodes[1] & 0xf0) >> 0x4]
+          ) {
+            this.PC += 2;
+          }
+        } else if ((opcodes[0] & 0xf0) === 0x40) {
+          /**
+           * 4xkk - SNE Vx, byte
+           * Skip next instruction if Vx != kk.
+           *
+           * The interpreter compares register Vx to kk, and if they are not equal, increments
+           * the program counter by 2.
+           */
+          if (this.V[opcodes[0] & 0x0f] !== opcodes[1]) {
+            this.PC += 2;
+          }
         }
         break;
 
       /**
        * Load operations
+       * 6xkk - LD Vx, byte
+       * Annn - LD I, addr
+       * 8xy0 - LD Vx, Vy
        */
       case "LD":
         if ((opcodes[0] & 0xf0) === 0x60) {
@@ -577,6 +611,8 @@ class Chip8 {
 
       /**
        * Add operations
+       * 7xkk - ADD Vx, byte
+       * 8xy4 - ADD Vx, Vy
        */
       case "ADD":
         // VF write gaurd
@@ -1086,11 +1122,19 @@ class Chip8Debugger {
 
         /**
          * 4xkk - SNE Vx, kk
+         * 9xy0 - SNE Vx, Vy
          */
         case "SNE":
-          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
-            16
-          )}, 0x${opcodes[1].toString(16)}\n`;
+          if ((opcodes[0] & 0xf0) === 0x90 && (opcodes[1] & 0x0f) === 0x0) {
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+              (opcodes[1] & 0xf0) >>
+              0x4
+            ).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0x40) {
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, 0x${opcodes[1].toString(16)}\n`;
+          }
           break;
 
         /**
@@ -1364,12 +1408,10 @@ async function test_generic() {
     0x64, 0x07,
     // LD V5, 0x02
     0x65, 0x02,
-    // SUBN V4, V5
-    0x8f, 0x57,
-    // ADD V4, V5
-    0x8f, 0x54,
+    // SNE Vx, Vy
+    0x94, 0x50,
     // JMP
-    0x12, 0x06,
+    0x12, 0x08,
   ];
   chip8.loadROM(rom);
   return rom;
