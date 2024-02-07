@@ -401,6 +401,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Bnnn - JP V0, addr
+       * Jump to location nnn + V0.
+       *
+       * The program counter is set to nnn plus the value of V0.
+       */
+      case (opcodes[0] & 0xf0) === 0xb0:
+        return { mnemonic: "JP", opcodes };
+
+      /**
        * Dxyn - DRW Vx, Vy, nibble
        * Display n-byte sprite starting at memory location I at (Vx, Vy),
        * set VF = collision.
@@ -470,18 +479,49 @@ class Chip8 {
         break;
 
       /**
-       * 1nnn - JP addr
-       * Jump to location nnn.
-       *
-       * The interpreter sets the program counter to nnn.
+       * Jump operations
        */
       case "JP":
-        {
+        if ((opcodes[0] & 0xf0) === 0x10) {
+          /**
+           * 1nnn - JP addr
+           * Jump to location nnn.
+           *
+           * The interpreter sets the program counter to nnn.
+           */
           let addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+
+          // reserved address gaurd
           if (addr < 0x200) {
             this.panic("illegal jump to reserved address");
           }
+
+          // out of bounds gaurd
+          if (addr >= this.memory.length) {
+            this.panic("illegal jump to out of bounds address");
+          }
+
           this.PC = addr;
+        } else if ((opcodes[0] & 0xf0) === 0xb0) {
+          /**
+           * Bnnn - JP V0, addr
+           * Jump to location nnn + V0.
+           *
+           * The program counter is set to nnn plus the value of V0.
+           */
+          let addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+
+          // reserved address gaurd
+          if (addr < 0x200) {
+            this.panic("illegal jump to reserved address");
+          }
+
+          // out of bounds gaurd
+          if (addr >= this.memory.length) {
+            this.panic("illegal jump to out of bounds address");
+          }
+
+          this.PC = addr + this.V[0x0];
         }
         break;
 
@@ -1096,12 +1136,20 @@ class Chip8Debugger {
 
         /**
          * 1nnn - JP nnn
+         * Bnnn - JP V0, nnn
          */
         case "JP":
-          dumpText += `${mnemonic} 0x${(
-            ((opcodes[0] & 0x0f) << 8) +
-            opcodes[1]
-          ).toString(16)}\n`;
+          if ((opcodes[0] & 0xf0) === 0x10) {
+            dumpText += `${mnemonic} 0x${(
+              ((opcodes[0] & 0x0f) << 8) +
+              opcodes[1]
+            ).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xb0) {
+            dumpText += `${mnemonic} v0, 0x${(
+              ((opcodes[0] & 0x0f) << 8) +
+              opcodes[1]
+            ).toString(16)}\n`;
+          }
           break;
 
         /**
@@ -1421,6 +1469,10 @@ async function test_generic() {
     0x65, 0x02,
     // SNE Vx, Vy
     0x94, 0x50,
+    // LD V0, 0x0
+    0x60, 0x0,
+    // JP v0, 0x200
+    0xb2, 0x00,
     // JMP
     0x12, 0x06,
   ];
@@ -1432,7 +1484,7 @@ async function test_generic() {
  * Entrypoint
  */
 async function main() {
-  await test_ibm();
+  await test_generic();
 }
 
 main();
