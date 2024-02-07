@@ -410,6 +410,17 @@ class Chip8 {
         return { mnemonic: "JP", opcodes };
 
       /**
+       * Cxkk - RND Vx, byte
+       * Set Vx = random byte AND kk.
+       *
+       * The interpreter generates a random number from 0 to 255, which is then ANDed
+       * with the value kk. The results are stored in Vx. See instruction 8xy2 for more
+       * information on AND.
+       */
+      case (opcodes[0] & 0xf0) === 0xc0:
+        return { mnemonic: "RND", opcodes };
+
+      /**
        * Dxyn - DRW Vx, Vy, nibble
        * Display n-byte sprite starting at memory location I at (Vx, Vy),
        * set VF = collision.
@@ -834,6 +845,21 @@ class Chip8 {
 
         this.V[0xf] = this.V[opcodes[0] & 0x0f] >> 7;
         this.V[opcodes[0] & 0x0f] <<= 1;
+        break;
+
+      /**
+       * Cxkk - RND Vx, byte
+       * Set Vx = random byte AND kk.
+       *
+       * The interpreter generates a random number from 0 to 255, which is then ANDed
+       * with the value kk. The results are stored in Vx. See instruction 8xy2 for more
+       * information on AND.
+       */
+      case "RND":
+        // VF write gaurd
+        this.checkVFWriteGaurd(opcodes[0]);
+        this.V[opcodes[0] & 0x0f] =
+          Math.floor(Math.random() * 0xff) & opcodes[1];
         break;
 
       /**
@@ -1303,6 +1329,15 @@ class Chip8Debugger {
           break;
 
         /**
+         * Cxkk - RND Vx, byte
+         */
+        case "RND":
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, 0x${(
+            opcodes[1] & 0x0f
+          ).toString(16)}\n`;
+          break;
+
+        /**
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
@@ -1465,14 +1500,8 @@ async function test_generic() {
   let rom = [
     // LD V4, 0x07
     0x64, 0x02,
-    // LD V5, 0x02
-    0x65, 0x02,
-    // SNE Vx, Vy
-    0x94, 0x50,
-    // LD V0, 0x0
-    0x60, 0x0,
-    // JP v0, 0x200
-    0xb2, 0x00,
+    // RND V4, 0xde
+    0xc4, 0xff,
     // JMP
     0x12, 0x06,
   ];
