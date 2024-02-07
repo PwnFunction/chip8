@@ -109,6 +109,17 @@ class Chip8 {
      * should be stored in the interpreter area of Chip-8 memory (0x000 to 0x1FF).
      * Below is a listing of each character's bytes, in binary and hexadecimal:
      *
+     * Example: The hexadecimal digit "0" is represented by the following 5 bytes:
+     *
+     * "0"	  Binary	   Hex
+     * ****   11110000   0xF0
+     * *  *   10010000   0x90
+     * *  *   10010000   0x90
+     * *  *   10010000   0x90
+     * ****   11110000   0xF0
+     *
+     * '0' is represented as [0xF0, 0x90, 0x90, 0x90, 0xF0], similarly for others
+     *
      * 0xF0, 0x90, 0x90, 0x90, 0xF0 // 0
      * 0x20, 0x60, 0x20, 0x20, 0x70 // 1
      * 0xF0, 0x10, 0xF0, 0x80, 0xF0 // 2
@@ -424,9 +435,6 @@ class Chip8 {
     const opcodes = this.fetch();
     const { mnemonic } = this.decode(opcodes);
 
-    // temp
-    let addr = 0;
-
     switch (mnemonic) {
       /**
        * 0nnn - SYS addr
@@ -468,12 +476,13 @@ class Chip8 {
        * The interpreter sets the program counter to nnn.
        */
       case "JP":
-        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
-        if (addr < 0x200) {
-          this.panic("illegal jump to reserved address");
+        {
+          let addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+          if (addr < 0x200) {
+            this.panic("illegal jump to reserved address");
+          }
+          this.PC = addr;
         }
-
-        this.PC = addr;
         break;
 
       /**
@@ -484,20 +493,22 @@ class Chip8 {
        * the top of the stack. The PC is then set to nnn.
        */
       case "CALL":
-        addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+        {
+          let addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
 
-        // out of bounds gaurd
-        if (addr < 0x200) {
-          this.panic("illegal subroutine call to reserved address");
+          // out of bounds gaurd
+          if (addr < 0x200) {
+            this.panic("illegal subroutine call to reserved address");
+          }
+
+          // stack overflow gaurd
+          if (this.SP >= this.stack.length) {
+            this.panic("call stack exceeded");
+          }
+
+          this.stack[this.SP++] = this.PC;
+          this.PC = addr;
         }
-
-        // stack overflow gaurd
-        if (this.SP >= this.stack.length) {
-          this.panic("call stack exceeded");
-        }
-
-        this.stack[this.SP++] = this.PC;
-        this.PC = addr;
         break;
 
       /**
@@ -590,7 +601,7 @@ class Chip8 {
            *
            * The value of register I is set to nnn.
            */
-          addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
+          let addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
           this.I = addr;
         } else if (
           (opcodes[0] & 0xf0) === 0x80 &&
@@ -1405,13 +1416,13 @@ async function test_draw() {
 async function test_generic() {
   let rom = [
     // LD V4, 0x07
-    0x64, 0x07,
+    0x64, 0x02,
     // LD V5, 0x02
     0x65, 0x02,
     // SNE Vx, Vy
     0x94, 0x50,
     // JMP
-    0x12, 0x08,
+    0x12, 0x06,
   ];
   chip8.loadROM(rom);
   return rom;
@@ -1421,7 +1432,7 @@ async function test_generic() {
  * Entrypoint
  */
 async function main() {
-  await test_generic();
+  await test_ibm();
 }
 
 main();
