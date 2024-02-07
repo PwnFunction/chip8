@@ -152,8 +152,11 @@ class Chip8 {
       0x50
     );
 
-    // halt execution
+    /**
+     * System states
+     */
     this.halt = false;
+    this.panicState = false;
   }
 
   /**
@@ -349,6 +352,16 @@ class Chip8 {
         return { mnemonic: "SUBN", opcodes };
 
       /**
+       * 8xyE - SHL Vx {, Vy}
+       * Set Vx = Vx SHL 1.
+       *
+       * If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
+       * Then Vx is multiplied by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0xe:
+        return { mnemonic: "SHL", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -393,7 +406,7 @@ class Chip8 {
    */
   execute() {
     // halt execution
-    if (this.halt) {
+    if (this.halt || this.panicState) {
       return;
     }
 
@@ -432,7 +445,7 @@ class Chip8 {
        */
       case "RET":
         if (this.SP === 0) {
-          throw new Error("cannot return, call stack is empty");
+          this.panic("cannot return, call stack is empty");
         }
 
         this.PC = this.stack[this.SP--];
@@ -447,7 +460,7 @@ class Chip8 {
       case "JP":
         addr = ((opcodes[0] & 0x0f) << 8) + opcodes[1];
         if (addr < 0x200) {
-          throw new Error("illegal jump to reserved address");
+          this.panic("illegal jump to reserved address");
         }
 
         this.PC = addr;
@@ -465,12 +478,12 @@ class Chip8 {
 
         // out of bounds gaurd
         if (addr < 0x200) {
-          throw new Error("illegal subroutine call to reserved address");
+          this.panic("illegal subroutine call to reserved address");
         }
 
         // stack overflow gaurd
         if (this.SP >= this.stack.length) {
-          throw new Error("call stack exceeded");
+          this.panic("call stack exceeded");
         }
 
         this.stack[this.SP++] = this.PC;
@@ -534,9 +547,7 @@ class Chip8 {
            * The interpreter puts the value kk into register Vx.
            */
           // VF write gaurd
-          if ((opcodes[0] & 0x0f) === 0xf) {
-            throw new Error("(VF register is reserved, cannot perform write)");
-          }
+          this.checkVFWriteGaurd(opcodes[0]);
           this.V[opcodes[0] & 0x0f] = opcodes[1];
         } else if ((opcodes[0] & 0xf0) === 0xa0) {
           /**
@@ -558,9 +569,7 @@ class Chip8 {
            * Stores the value of register Vy in register Vx.
            */
           // VF write gaurd
-          if ((opcodes[0] & 0x0f) === 0xf) {
-            throw new Error("(VF register is reserved, cannot perform write)");
-          }
+          this.checkVFWriteGaurd(opcodes[0]);
           this.V[opcodes[0] & 0x0f] = this.V[(opcodes[1] & 0xf0) >> 0x4];
         }
 
@@ -571,9 +580,8 @@ class Chip8 {
        */
       case "ADD":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
+
         if ((opcodes[0] & 0xf0) === 0x70) {
           /**
            * 7xkk - ADD Vx, byte
@@ -611,9 +619,7 @@ class Chip8 {
        */
       case "OR":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         this.V[opcodes[0] & 0x0f] |= this.V[(opcodes[1] & 0xf0) >> 0x4];
         break;
@@ -628,9 +634,7 @@ class Chip8 {
        */
       case "AND":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         this.V[opcodes[0] & 0x0f] &= this.V[(opcodes[1] & 0xf0) >> 0x4];
         break;
@@ -646,9 +650,7 @@ class Chip8 {
        */
       case "XOR":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         this.V[opcodes[0] & 0x0f] ^= this.V[(opcodes[1] & 0xf0) >> 0x4];
         break;
@@ -662,9 +664,7 @@ class Chip8 {
        */
       case "SUB":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         // not sure if in equal case VF should be set to 1
         this.V[0xf] =
@@ -683,9 +683,7 @@ class Chip8 {
        */
       case "SHR":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         /**
          * In the CHIP-8 interpreter for the original COSMAC VIP, this instruction did the
@@ -713,9 +711,7 @@ class Chip8 {
        */
       case "SUBN":
         // VF write gaurd
-        if ((opcodes[0] & 0x0f) === 0xf) {
-          throw new Error("(VF register is reserved, cannot perform write)");
-        }
+        this.checkVFWriteGaurd(opcodes[0]);
 
         this.V[0xf] =
           this.V[(opcodes[1] & 0xf0) >> 0x4] > this.V[opcodes[0] & 0x0f]
@@ -723,6 +719,34 @@ class Chip8 {
             : 0;
         this.V[opcodes[0] & 0x0f] =
           this.V[(opcodes[1] & 0xf0) >> 0x4] - this.V[opcodes[0] & 0x0f];
+        break;
+
+      /**
+       * 8xyE - SHL Vx {, Vy}
+       * Set Vx = Vx SHL 1.
+       *
+       * If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
+       * Then Vx is multiplied by 2.
+       */
+      case "SHL":
+        // VF write gaurd
+        this.checkVFWriteGaurd(opcodes[0]);
+
+        /**
+         * In the CHIP-8 interpreter for the original COSMAC VIP, this instruction did the
+         * following: It put the value of VY into VX, and then shifted the value in VX 1 bit
+         * to the right (8XY6) or left (8XYE). VY was not affected, but the flag register VF
+         * would be set to the bit that was shifted out.
+         *
+         * However, starting with CHIP-48 and SUPER-CHIP in the early 1990s, these instructions
+         * were changed so that they shifted VX in place, and ignored the Y completely.
+         *
+         * This is one of the main differences between implementations that cause problems for
+         * programs.
+         */
+
+        this.V[0xf] = this.V[opcodes[0] & 0x0f] >> 7;
+        this.V[opcodes[0] & 0x0f] <<= 1;
         break;
 
       /**
@@ -775,12 +799,31 @@ class Chip8 {
        * Invalid opcode
        */
       default:
-        throw new Error(
+        this.panic(
           `invalid opcode (0x${opcodes[0].toString(
             16
           )}, 0x${opcodes[1].toString(16)})`
         );
     }
+  }
+
+  /**
+   * Check VF write gaurd
+   */
+  checkVFWriteGaurd(opcode) {
+    if ((opcode & 0x0f) === 0xf) {
+      this.panic("(VF register is reserved, cannot perform write)");
+    }
+  }
+
+  /**
+   * Panic
+   */
+  panic(message) {
+    this.panicState = true;
+    this.halt = true;
+    this.PC -= 2;
+    throw new Error(message);
   }
 
   /**
@@ -963,7 +1006,13 @@ class Chip8Debugger {
     )}\n\n  stack\n${Array.from(this.chip8.stack)
       .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
       .join("")}\n  state: ${
-      this.chip8.halt ? "halt" : this.started ? "running" : "idle"
+      this.chip8.panicState
+        ? "panic"
+        : this.chip8.halt
+        ? "halt"
+        : this.started
+        ? "running"
+        : "idle"
     }\n\n`;
   }
 
@@ -1024,13 +1073,14 @@ class Chip8Debugger {
          */
         case "SE":
           if ((opcodes[0] & 0xf0) === 0x30) {
-            dumpText += `${mnemonic} v${
-              opcodes[0] & 0x0f
-            }, 0x${opcodes[1].toString(16)}\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, 0x${opcodes[1].toString(16)}\n`;
           } else if ((opcodes[0] & 0xf0) === 0x50) {
-            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-              (opcodes[1] & 0xf0) >> 0x4
-            }\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+              (opcodes[1] & 0xf0) >>
+              0x4
+            ).toString(16)}\n`;
           }
           break;
 
@@ -1038,9 +1088,9 @@ class Chip8Debugger {
          * 4xkk - SNE Vx, kk
          */
         case "SNE":
-          dumpText += `${mnemonic} v${
-            opcodes[0] & 0x0f
-          }, 0x${opcodes[1].toString(16)}\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+            16
+          )}, 0x${opcodes[1].toString(16)}\n`;
           break;
 
         /**
@@ -1050,9 +1100,9 @@ class Chip8Debugger {
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
-            dumpText += `${mnemonic} v${
-              opcodes[0] & 0x0f
-            }, 0x${opcodes[1].toString(16)}\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, 0x${opcodes[1].toString(16)}\n`;
           } else if ((opcodes[0] & 0xf0) === 0xa0) {
             dumpText += `${mnemonic} I, 0x${(
               ((opcodes[0] & 0x0f) << 8) +
@@ -1062,9 +1112,10 @@ class Chip8Debugger {
             (opcodes[0] & 0xf0) === 0x80 &&
             (opcodes[1] & 0x0f) === 0x0
           ) {
-            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-              (opcodes[1] & 0xf0) >> 0x4
-            }\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+              (opcodes[1] & 0xf0) >>
+              0x4
+            ).toString(16)}\n`;
           }
           break;
 
@@ -1074,16 +1125,17 @@ class Chip8Debugger {
          */
         case "ADD":
           if ((opcodes[0] & 0xf0) === 0x70) {
-            dumpText += `${mnemonic} v${
-              opcodes[0] & 0x0f
-            }, 0x${opcodes[1].toString(16)}\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, 0x${opcodes[1].toString(16)}\n`;
           } else if (
             (opcodes[0] & 0xf0) === 0x80 &&
             (opcodes[1] & 0x0f) === 0x4
           ) {
-            dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-              (opcodes[1] & 0xf0) >> 0x4
-            }\n`;
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+              (opcodes[1] & 0xf0) >>
+              0x4
+            ).toString(16)}\n`;
           }
           break;
 
@@ -1091,63 +1143,70 @@ class Chip8Debugger {
          * 8xy1 - OR Vx, Vy
          */
         case "OR":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}\n`;
           break;
 
         /**
          * 8xy2 - AND Vx, Vy
          */
         case "AND":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}\n`;
           break;
 
         /**
          * 8xy3 - XOR Vx, Vy
          */
         case "XOR":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}\n`;
           break;
 
         /**
          * 8xy5 - SUB Vx, Vy
          */
         case "SUB":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}\n`;
           break;
 
         /**
          * 8xy6 - SHR Vx {, Vy}
          */
         case "SHR":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f} {, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }}\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)} {, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}}\n`;
           break;
 
         /**
          * 8xy7 - SUBN Vx, Vy
          */
         case "SUBN":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}\n`;
           break;
 
         /**
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
-          dumpText += `${mnemonic} v${opcodes[0] & 0x0f}, v${
-            (opcodes[1] & 0xf0) >> 0x4
-          }, 0x${(opcodes[1] & 0x0f).toString(16)}\n`;
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, v${(
+            (opcodes[1] & 0xf0) >>
+            0x4
+          ).toString(16)}, 0x${(opcodes[1] & 0x0f).toString(16)}\n`;
           break;
 
         /**
@@ -1306,7 +1365,9 @@ async function test_generic() {
     // LD V5, 0x02
     0x65, 0x02,
     // SUBN V4, V5
-    0x84, 0x57,
+    0x8f, 0x57,
+    // ADD V4, V5
+    0x8f, 0x54,
     // JMP
     0x12, 0x06,
   ];
