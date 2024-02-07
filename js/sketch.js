@@ -329,6 +329,16 @@ class Chip8 {
         return { mnemonic: "SUB", opcodes };
 
       /**
+       * 8xy6 - SHR Vx {, Vy}
+       * Set Vx = Vx SHR 1.
+       *
+       * If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx
+       * is divided by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0x80 && (opcodes[1] & 0x0f) === 0x6:
+        return { mnemonic: "SHR", opcodes };
+
+      /**
        * Annn - LD I, addr
        * Set I = nnn.
        *
@@ -652,6 +662,36 @@ class Chip8 {
             ? 1
             : 0;
         this.V[opcodes[0] & 0x0f] -= this.V[(opcodes[1] & 0xf0) >> 0x4];
+        break;
+
+      /**
+       * 8xy6 - SHR Vx {, Vy}
+       * Set Vx = Vx SHR 1.
+       *
+       * If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx
+       * is divided by 2.
+       */
+      case "SHR":
+        // VF write gaurd
+        if ((opcodes[0] & 0x0f) === 0xf) {
+          throw new Error("(VF register is reserved, cannot perform write)");
+        }
+
+        /**
+         * In the CHIP-8 interpreter for the original COSMAC VIP, this instruction did the
+         * following: It put the value of VY into VX, and then shifted the value in VX 1 bit
+         * to the right (8XY6) or left (8XYE). VY was not affected, but the flag register VF
+         * would be set to the bit that was shifted out.
+         *
+         * However, starting with CHIP-48 and SUPER-CHIP in the early 1990s, these instructions
+         * were changed so that they shifted VX in place, and ignored the Y completely.
+         *
+         * This is one of the main differences between implementations that cause problems for
+         * programs.
+         */
+
+        this.V[0xf] = this.V[opcodes[0] & 0x0f] & 0x1;
+        this.V[opcodes[0] & 0x0f] >>= 1;
         break;
 
       /**
@@ -1053,6 +1093,15 @@ class Chip8Debugger {
           break;
 
         /**
+         * 8xy6 - SHR Vx {, Vy}
+         */
+        case "SHR":
+          dumpText += `${mnemonic} v${opcodes[0] & 0x0f} {, v${
+            (opcodes[1] & 0xf0) >> 0x4
+          }}\n`;
+          break;
+
+        /**
          * Dxyn - DRW Vx, Vy, n
          */
         case "DRW":
@@ -1224,6 +1273,8 @@ async function test_generic() {
     0x84, 0x54,
     // SUB V4, V5
     0x84, 0x55,
+    // SHR V4
+    0x84, 0x06,
     // JMP
     0x12, 0x0a,
   ];
