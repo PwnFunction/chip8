@@ -279,6 +279,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * 7xkk - ADD Vx, byte
+       * Set Vx = Vx + kk.
+       *
+       * Adds the value kk to the value of register Vx, then stores the result in Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0x70:
+        return { mnemonic: "ADD", opcodes };
+
+      /**
        * 8xy0 - LD Vx, Vy
        * Set Vx = Vy.
        *
@@ -390,15 +399,6 @@ class Chip8 {
        */
       case (opcodes[0] & 0xf0) === 0xa0:
         return { mnemonic: "LD", opcodes };
-
-      /**
-       * 7xkk - ADD Vx, byte
-       * Set Vx = Vx + kk.
-       *
-       * Adds the value kk to the value of register Vx, then stores the result in Vx.
-       */
-      case (opcodes[0] & 0xf0) === 0x70:
-        return { mnemonic: "ADD", opcodes };
 
       /**
        * Dxyn - DRW Vx, Vy, nibble
