@@ -905,8 +905,7 @@ class Chip8 {
       case "ZERO":
         // halt execution
         this.halt = true;
-        this.PC -= 2;
-        break;
+        this.panicState = true;
 
       /**
        * Invalid opcode
@@ -1591,7 +1590,7 @@ async function test_generic() {
     // RND V4, 0xde
     0xc4, 0xff,
     // JMP
-    0x12, 0x06,
+    0x12, 0x04,
   ];
   chip8.loadROM(rom);
   return rom;
@@ -1605,3 +1604,41 @@ async function main() {
 }
 
 main();
+
+/**
+ * Event listeners
+ */
+
+// Auto update toggle
+document.querySelector("#auto-update").addEventListener("click", (e) => {
+  chip8Debugger.toggleAutoUpdate();
+  e.currentTarget.innerText = chip8Debugger.autoUpdate
+    ? "auto update is on"
+    : "auto update is off";
+});
+
+/**
+ * Update start stop continue button
+ * @param {HTMLButtonElement} button
+ */
+function updateStartStopContinue(button) {
+  if (!button) {
+    button = document.querySelector("#start-stop-continue");
+  }
+
+  if (!chip8Debugger.started) {
+    chip8Debugger.continueExecution();
+    button.innerText = "stop";
+  } else if (chip8Debugger.started && !chip8.halt) {
+    chip8Debugger.stopExecution();
+    button.innerText = "continue";
+  } else if (chip8Debugger.started && chip8.halt) {
+    chip8Debugger.continueExecution();
+    button.innerText = "stop";
+  }
+}
+document
+  .querySelector("#start-stop-continue")
+  .addEventListener("click", (e) => {
+    updateStartStopContinue(e.currentTarget);
+  });
