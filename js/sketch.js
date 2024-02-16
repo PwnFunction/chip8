@@ -493,6 +493,16 @@ class Chip8 {
         return { mnemonic: "SKP", opcodes };
 
       /**
+       * ExA1 - SKNP Vx
+       * Skip next instruction if key with the value of Vx is not pressed.
+       *
+       * Checks the keyboard, and if the key corresponding to the value of Vx is currently
+       * in the up position, PC is increased by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0xe0 && opcodes[1] === 0xa1:
+        return { mnemonic: "SKNP", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -977,6 +987,19 @@ class Chip8 {
         break;
 
       /**
+       * ExA1 - SKNP Vx
+       * Skip next instruction if key with the value of Vx is not pressed.
+       *
+       * Checks the keyboard, and if the key corresponding to the value of Vx is currently
+       * in the up position, PC is increased by 2.
+       */
+      case "SKNP":
+        if (this.keyBuffer[this.V[opcodes[0] & 0x0f]] === 0) {
+          this.PC += 2;
+        }
+        break;
+
+      /**
        * Zero operations
        */
       case "ZERO":
@@ -1454,6 +1477,13 @@ class Chip8Debugger {
           break;
 
         /**
+         * ExA1 - SKNP Vx
+         */
+        case "SKNP":
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}\n`;
+          break;
+
+        /**
          * Zero operations, end of program
          */
         case "ZERO":
@@ -1694,8 +1724,8 @@ async function test_generic() {
   let rom = [
     // LD V4, 0x02
     0x64, 0x02,
-    // SKP V4
-    0xe4, 0x9e,
+    // SKNP V4
+    0xe4, 0xa1,
     // JMP
     0x12, 0x02,
     // CLS
