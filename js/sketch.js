@@ -1018,7 +1018,9 @@ class Chip8Debugger {
   constructor(chip8Instance) {
     this.chip8 = chip8Instance;
     this.vmemDump = document.querySelector("#vmem-dump");
+    this.vmemMd5 = document.querySelector("#vmem-md5");
     this.heapDump = document.querySelector("#heap-dump");
+    this.heapMd5 = document.querySelector("#heap-md5");
     this.regDump = document.querySelector("#reg-dump");
     this.disassemblyDump = document.querySelector("#disass-dump");
     this.autoUpdate = true;
@@ -1030,10 +1032,20 @@ class Chip8Debugger {
 
   updateVmemDump() {
     this.updateElement(this.vmemDump, this.formatVmem());
+    this.vmemMd5.innerText = CryptoJS.MD5(
+      CryptoJS.lib.WordArray.create(this.chip8.frameBuffer)
+    )
+      .toString()
+      .slice(0, 6);
   }
 
   updateHeapDump() {
     this.updateElement(this.heapDump, this.formatHeap());
+    this.heapMd5.innerText = CryptoJS.MD5(
+      CryptoJS.lib.WordArray.create(this.chip8.memory)
+    )
+      .toString()
+      .slice(0, 6);
   }
 
   updateRegDump() {
