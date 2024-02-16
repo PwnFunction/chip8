@@ -164,10 +164,64 @@ class Chip8 {
     );
 
     /**
+     * The computers which originally used the Chip-8 Language had a 16-key hexadecimal keypad
+     * with the following layout:
+     *
+     * 1 2 3 C
+     * 4 5 6 D
+     * 7 8 9 E
+     * A 0 B F
+     *
+     * Mapping:
+     * 1 2 3 4
+     * q w e r
+     * a s d f
+     * z x c v
+     */
+    this.keyBuffer = new Uint8Array(16); /* 16-key hexadecimal keypad */
+    this.keyMap = {
+      1: 0,
+      2: 1,
+      3: 2,
+      4: 3,
+      q: 4,
+      w: 5,
+      e: 6,
+      r: 7,
+      a: 8,
+      s: 9,
+      d: 10,
+      f: 11,
+      z: 12,
+      x: 13,
+      c: 14,
+      v: 15,
+    };
+
+    // On keydown event, update the key buffer
+    window.addEventListener("keydown", (e) => {
+      this.toggleKey(e.key, 1);
+    });
+
+    // On keyup event, update the key buffer
+    window.addEventListener("keyup", (e) => {
+      this.toggleKey(e.key, 0);
+    });
+
+    /**
      * System states
      */
     this.halt = false;
     this.panicState = false;
+  }
+
+  /**
+   * Toggle a key in the key buffer based on the state
+   */
+  toggleKey(key, state) {
+    if (this.keyMap.hasOwnProperty(key)) {
+      this.keyBuffer[this.keyMap[key]] = state;
+    }
   }
 
   /**
@@ -1115,6 +1169,10 @@ class Chip8Debugger {
    * @returns {string} - Formatted registers
    */
   formatRegisters() {
+    const keyMap = Object.fromEntries(
+      Object.entries(this.chip8.keyMap).map(([key, value]) => [value, key])
+    );
+
     return `${Array.from(this.chip8.V)
       .map((v, i) => `  v${i.toString(16)} = 0x${v.toString(16)}`)
       .join("\n")}\n\n  I = 0x${this.chip8.I.toString(
@@ -1127,7 +1185,7 @@ class Chip8Debugger {
       16
     )}\n  sound = 0x${this.chip8.specialRegisters[1].toString(
       16
-    )}\n\n  stack\n${Array.from(this.chip8.stack)
+    )}\n\n  stack:\n${Array.from(this.chip8.stack)
       .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
       .join("")}\n  state: ${
       this.chip8.panicState
@@ -1137,7 +1195,14 @@ class Chip8Debugger {
         : this.started
         ? "running"
         : "idle"
-    }\n\n`;
+    }\n\n  keypad:\n   ${Array.from(this.chip8.keyBuffer)
+      .map(
+        (k, i) =>
+          `${k ? `(${keyMap[i]})` : ` ${keyMap[i]} `}${
+            (i + 1) % 4 === 0 ? "\n   " : ""
+          }`
+      )
+      .join("")}`;
   }
 
   /**

@@ -126,33 +126,3 @@ button {
 .md5::after {
   content: ")";
 }
-
-/* keyboard */
-#kbr {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
-  gap: 10px;
-  padding: 20px;
-  margin: 20px;
-  border: 1px solid #333;
-}
-
-.kbr-item {
-  padding: 20px;
-  border: 1px solid #333;
-  text-align: center;
-  color: #999;
-  user-select: none;
-}
-
-.kbr-item:hover {
-  cursor: pointer;
-  background: #333;
-  color: #fff;
-}
-
-.kbr-item:active {
-  background: #ff4473;
-  color: #fff;
-}
