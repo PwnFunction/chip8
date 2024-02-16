@@ -483,6 +483,16 @@ class Chip8 {
         return { mnemonic: "DRW", opcodes };
 
       /**
+       * Ex9E - SKP Vx
+       * Skip next instruction if key with the value of Vx is pressed.
+       *
+       * Checks the keyboard, and if the key corresponding to the value of Vx is currently
+       * in the down position, PC is increased by 2.
+       */
+      case (opcodes[0] & 0xf0) === 0xe0 && opcodes[1] === 0x9e:
+        return { mnemonic: "SKP", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -950,6 +960,19 @@ class Chip8 {
               this.V[0xf] = 1; // collision flag
             }
           }
+        }
+        break;
+
+      /**
+       * Ex9E - SKP Vx
+       * Skip next instruction if key with the value of Vx is pressed.
+       *
+       * Checks the keyboard, and if the key corresponding to the value of Vx is currently
+       * in the down position, PC is increased by 2.
+       */
+      case "SKP":
+        if (this.keyBuffer[this.V[opcodes[0] & 0x0f]] === 1) {
+          this.PC += 2;
         }
         break;
 
@@ -1424,6 +1447,13 @@ class Chip8Debugger {
           break;
 
         /**
+         * Ex9E - SKP Vx
+         */
+        case "SKP":
+          dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}\n`;
+          break;
+
+        /**
          * Zero operations, end of program
          */
         case "ZERO":
@@ -1662,12 +1692,14 @@ async function test_rnd_draw() {
 
 async function test_generic() {
   let rom = [
-    // LD V4, 0x07
+    // LD V4, 0x02
     0x64, 0x02,
-    // RND V4, 0xde
-    0xc4, 0xff,
+    // SKP V4
+    0xe4, 0x9e,
     // JMP
-    0x12, 0x04,
+    0x12, 0x02,
+    // CLS
+    0x00, 0xe0,
   ];
   chip8.loadROM(rom);
   return rom;
