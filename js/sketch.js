@@ -202,6 +202,10 @@ class Chip8 {
     window.addEventListener("keydown", (e) => {
       this.toggleKey(e.key, 1);
     });
+    // On keypress event, update the key buffer
+    window.addEventListener("keypress", (e) => {
+      this.toggleKey(e.key, 1);
+    });
 
     // On keyup event, update the key buffer
     window.addEventListener("keyup", (e) => {
@@ -512,6 +516,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx0A - LD Vx, K
+       * Wait for a key press, store the value of the key in Vx.
+       *
+       * All execution stops until a key is pressed, then the value of that key is stored in Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x0a:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -760,6 +773,21 @@ class Chip8 {
           // VF write gaurd
           this.checkVFWriteGaurd(opcodes[0]);
           this.V[opcodes[0] & 0x0f] = this.DT;
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x0a) {
+          /**
+           * Fx0A - LD Vx, K
+           * Wait for a key press, store the value of the key in Vx.
+           *
+           * All execution stops until a key is pressed, then the value of that key is stored in Vx.
+           */
+          // VF write gaurd
+          this.checkVFWriteGaurd(opcodes[0]);
+          this.PC -= 2;
+          const key = this.keyBuffer.indexOf(1);
+          if (key !== -1) {
+            this.V[opcodes[0] & 0x0f] = key;
+            this.PC += 2;
+          }
         }
 
         break;
@@ -1390,6 +1418,8 @@ class Chip8Debugger {
             dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
               16
             )}, DT\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x0a) {
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, K\n`;
           }
           break;
 
@@ -1753,8 +1783,8 @@ async function test_generic() {
     0x12, 0x02,
     // CLS
     0x00, 0xe0,
-    // LD V4, DT
-    0xf4, 0x07,
+    // LD V4, K
+    0xf4, 0x0a,
   ];
   chip8.loadROM(rom);
   return rom;
