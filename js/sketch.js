@@ -72,9 +72,9 @@ class Chip8 {
     this.I = 0x0; /* 16-bit address pointer */
     this.PC = 0x200; /* 16-bit program counter */
     this.SP = 0x0; /* 8-bit stack pointer */
-    this.specialRegisters = new Uint8Array(
-      2
-    ); /* 2, 8-bit registers (delay(0) and sound timers(1)) */
+    /* (delay(0) and sound timers(1)) */
+    this.DT = 0x0;
+    this.ST = 0x0;
     this.stack = new Uint16Array(16); /* 16, 16-bit values */
 
     /**
@@ -503,6 +503,15 @@ class Chip8 {
         return { mnemonic: "SKNP", opcodes };
 
       /**
+       * Fx07 - LD Vx, DT
+       * Set Vx = delay timer value.
+       *
+       * The value of DT is placed into Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x07:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -741,6 +750,16 @@ class Chip8 {
           // VF write gaurd
           this.checkVFWriteGaurd(opcodes[0]);
           this.V[opcodes[0] & 0x0f] = this.V[(opcodes[1] & 0xf0) >> 0x4];
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x07) {
+          /**
+           * Fx07 - LD Vx, DT
+           * Set Vx = delay timer value.
+           *
+           * The value of DT is placed into Vx.
+           */
+          // VF write gaurd
+          this.checkVFWriteGaurd(opcodes[0]);
+          this.V[opcodes[0] & 0x0f] = this.DT;
         }
 
         break;
@@ -1227,11 +1246,11 @@ class Chip8Debugger {
       16
     )}\n  SP = 0x${this.chip8.SP.toString(
       16
-    )}\n\n  delay = 0x${this.chip8.specialRegisters[0].toString(
+    )}\n\n  delay = 0x${this.chip8.DT.toString(
       16
-    )}\n  sound = 0x${this.chip8.specialRegisters[1].toString(
-      16
-    )}\n\n  stack:\n${Array.from(this.chip8.stack)
+    )}\n  sound = 0x${this.chip8.ST.toString(16)}\n\n  stack:\n${Array.from(
+      this.chip8.stack
+    )
       .map((s, i) => `   0x${i.toString(16)}: 0x${s.toString(16)}\n`)
       .join("")}\n  state: ${
       this.chip8.panicState
@@ -1244,9 +1263,9 @@ class Chip8Debugger {
     }\n\n  keypad:\n   ${Array.from(this.chip8.keyBuffer)
       .map(
         (k, i) =>
-          `${k ? `(${keyMap[i]})` : ` ${keyMap[i]} `}${
-            (i + 1) % 4 === 0 ? "\n   " : ""
-          }`
+          `${
+            k ? `(${keyMap[i].toUpperCase()})` : ` ${keyMap[i].toUpperCase()} `
+          }${(i + 1) % 4 === 0 ? "\n   " : ""}`
       )
       .join("")}`;
   }
@@ -1367,6 +1386,10 @@ class Chip8Debugger {
               (opcodes[1] & 0xf0) >>
               0x4
             ).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x07) {
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, DT\n`;
           }
           break;
 
@@ -1730,6 +1753,8 @@ async function test_generic() {
     0x12, 0x02,
     // CLS
     0x00, 0xe0,
+    // LD V4, DT
+    0xf4, 0x07,
   ];
   chip8.loadROM(rom);
   return rom;
