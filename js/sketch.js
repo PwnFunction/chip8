@@ -582,6 +582,16 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx65 - LD Vx, [I]
+       * Read registers V0 through Vx from memory starting at location I.
+       *
+       * The interpreter reads values from memory starting at location I into registers V0
+       * through Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x65:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -793,6 +803,7 @@ class Chip8 {
        * Fx29 - LD F, Vx
        * Fx33 - LD B, Vx
        * Fx55 - LD [I], Vx
+       * Fx65 - LD Vx, [I]
        */
       case "LD":
         if ((opcodes[0] & 0xf0) === 0x60) {
@@ -917,6 +928,17 @@ class Chip8 {
 
           for (let i = 0; i <= (opcodes[0] & 0x0f); i++) {
             this.memory[this.I + i] = this.V[i];
+          }
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x65) {
+          /**
+           * Fx65 - LD Vx, [I]
+           * Read registers V0 through Vx from memory starting at location I.
+           *
+           * The interpreter reads values from memory starting at location I into registers V0
+           * through Vx.
+           */
+          for (let i = 0; i <= (opcodes[0] & 0x0f); i++) {
+            this.V[i] = this.memory[this.I + i]; // VF overwrite?
           }
         }
 
@@ -1541,6 +1563,7 @@ class Chip8Debugger {
          * Fx29 - LD F, Vx
          * Fx33 - LD B, Vx
          * Fx55 - LD [I], Vx
+         * Fx65 - LD Vx, [I]
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
@@ -1582,6 +1605,10 @@ class Chip8Debugger {
             dumpText += `${mnemonic} [I], v${(opcodes[0] & 0x0f).toString(
               16
             )}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x65) {
+            dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(
+              16
+            )}, [I]\n`;
           }
           break;
 
@@ -1975,6 +2002,24 @@ async function test_generic() {
     0x65, 0x09,
     // LD [I], V5
     0xf5, 0x55,
+
+    // clear out v0 to v5
+    // LD v0, 0
+    0x60, 0x00,
+    // LD v1, 0
+    0x61, 0x00,
+    // LD v2, 0
+    0x62, 0x00,
+    // LD v3, 0
+    0x63, 0x00,
+    // LD v4, 0
+    0x64, 0x00,
+    // LD v5, 0
+    0x65, 0x00,
+
+    // load v0 to v5 from [I]
+    // LD v5, [I]
+    0xf3, 0x65,
   ];
   chip8.loadROM(rom);
   return rom;
