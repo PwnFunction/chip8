@@ -572,6 +572,16 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx55 - LD [I], Vx
+       * Store registers V0 through Vx in memory starting at location I.
+       *
+       * The interpreter copies the values of registers V0 through Vx into memory, starting at
+       * the address in I.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x55:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -782,6 +792,7 @@ class Chip8 {
        * Fx18 - LD ST, Vx
        * Fx29 - LD F, Vx
        * Fx33 - LD B, Vx
+       * Fx55 - LD [I], Vx
        */
       case "LD":
         if ((opcodes[0] & 0xf0) === 0x60) {
@@ -888,6 +899,25 @@ class Chip8 {
           this.memory[this.I] = Math.floor(value / 100);
           this.memory[this.I + 1] = Math.floor((value % 100) / 10);
           this.memory[this.I + 2] = value % 10;
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x55) {
+          /**
+           * Fx55 - LD [I], Vx
+           * Store registers V0 through Vx in memory starting at location I.
+           *
+           * The interpreter copies the values of registers V0 through Vx into memory, starting at
+           * the address in I.
+           */
+          // Fontset overwrite gaurd
+          if (
+            this.I + (opcodes[0] & 0x0f) >= 0x50 &&
+            this.I + (opcodes[0] & 0x0f) <= 0x9f
+          ) {
+            this.panic("illegal fontset overwrite");
+          }
+
+          for (let i = 0; i <= (opcodes[0] & 0x0f); i++) {
+            this.memory[this.I + i] = this.V[i];
+          }
         }
 
         break;
@@ -1510,6 +1540,7 @@ class Chip8Debugger {
          * Fx18 - LD ST, Vx
          * Fx29 - LD F, Vx
          * Fx33 - LD B, Vx
+         * Fx55 - LD [I], Vx
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
@@ -1547,6 +1578,10 @@ class Chip8Debugger {
             dumpText += `${mnemonic} F, v${(opcodes[0] & 0x0f).toString(16)}\n`;
           } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x33) {
             dumpText += `${mnemonic} B, v${(opcodes[0] & 0x0f).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x55) {
+            dumpText += `${mnemonic} [I], v${(opcodes[0] & 0x0f).toString(
+              16
+            )}\n`;
           }
           break;
 
@@ -1926,10 +1961,20 @@ async function test_generic() {
   let rom = [
     // CLS
     0x00, 0xe0,
-    // LD v1, 156
-    0x61, 0x9c,
-    // LD B, V1
-    0xf1, 0x33,
+    // LD v0, 7
+    0x60, 0x07,
+    // LD v1, 9
+    0x61, 0x09,
+    // LD v2, 1
+    0x62, 0x01,
+    // LD v3, 9
+    0x63, 0x09,
+    // LD v4, 3
+    0x64, 0x03,
+    // LD v5, 9
+    0x65, 0x09,
+    // LD [I], V5
+    0xf5, 0x55,
   ];
   chip8.loadROM(rom);
   return rom;
