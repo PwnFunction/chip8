@@ -562,6 +562,16 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx33 - LD B, Vx
+       * Store BCD representation of Vx in memory locations I, I+1, and I+2.
+       *
+       * The interpreter takes the decimal value of Vx, and places the hundreds digit in memory
+       * at location in I, the tens digit at location I+1, and the ones digit at location I+2.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x33:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -766,6 +776,12 @@ class Chip8 {
        * 6xkk - LD Vx, byte
        * Annn - LD I, addr
        * 8xy0 - LD Vx, Vy
+       * Fx07 - LD Vx, DT
+       * Fx0A - LD Vx, K
+       * Fx15 - LD DT, Vx
+       * Fx18 - LD ST, Vx
+       * Fx29 - LD F, Vx
+       * Fx33 - LD B, Vx
        */
       case "LD":
         if ((opcodes[0] & 0xf0) === 0x60) {
@@ -850,6 +866,28 @@ class Chip8 {
            * value of Vx.
            */
           this.I = 0x50 + this.V[opcodes[0] & 0x0f] * 5; // 0x50 is the offset of the fontset
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x33) {
+          /**
+           * Fx33 - LD B, Vx
+           * Store BCD representation of Vx in memory locations I, I+1, and I+2.
+           *
+           * The interpreter takes the decimal value of Vx, and places the hundreds digit in memory
+           * at location in I, the tens digit at location I+1, and the ones digit at location I+2.
+           *
+           * This instruction is a little involved. It takes the number in VX (which is one byte,
+           * so it can be any number from 0 to 255) and converts it to three decimal digits, storing
+           * these digits in memory at the address in the index register I. For example, if VX
+           * contains 156 (or 9C in hexadecimal), it would put the number 1 at the address in I, 5
+           * in address I + 1, and 6 in address I + 2.
+           */
+          let value = this.V[opcodes[0] & 0x0f];
+          // Fontset overwrite gaurd
+          if (this.I + 2 >= 0x50 && this.I + 2 <= 0x9f) {
+            this.panic("illegal fontset overwrite");
+          }
+          this.memory[this.I] = Math.floor(value / 100);
+          this.memory[this.I + 1] = Math.floor((value % 100) / 10);
+          this.memory[this.I + 2] = value % 10;
         }
 
         break;
@@ -1471,6 +1509,7 @@ class Chip8Debugger {
          * Fx15 - LD DT, Vx
          * Fx18 - LD ST, Vx
          * Fx29 - LD F, Vx
+         * Fx33 - LD B, Vx
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
@@ -1506,6 +1545,8 @@ class Chip8Debugger {
             )}\n`;
           } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x29) {
             dumpText += `${mnemonic} F, v${(opcodes[0] & 0x0f).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x33) {
+            dumpText += `${mnemonic} B, v${(opcodes[0] & 0x0f).toString(16)}\n`;
           }
           break;
 
@@ -1881,11 +1922,24 @@ async function test_input_draw() {
   return rom;
 }
 
+async function test_generic() {
+  let rom = [
+    // CLS
+    0x00, 0xe0,
+    // LD v1, 156
+    0x61, 0x9c,
+    // LD B, V1
+    0xf1, 0x33,
+  ];
+  chip8.loadROM(rom);
+  return rom;
+}
+
 /*
  * Entrypoint
  */
 async function main() {
-  await test_input_draw();
+  await test_generic();
 }
 
 main();
