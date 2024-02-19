@@ -525,6 +525,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx15 - LD DT, Vx
+       * Set delay timer = Vx.
+       *
+       * DT is set equal to the value of Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x15:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -788,6 +797,14 @@ class Chip8 {
             this.V[opcodes[0] & 0x0f] = key;
             this.PC += 2;
           }
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x15) {
+          /**
+           * Fx15 - LD DT, Vx
+           * Set delay timer = Vx.
+           *
+           * DT is set equal to the value of Vx.
+           */
+          this.DT = this.V[opcodes[0] & 0x0f];
         }
 
         break;
@@ -1420,6 +1437,10 @@ class Chip8Debugger {
             )}, DT\n`;
           } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x0a) {
             dumpText += `${mnemonic} v${(opcodes[0] & 0x0f).toString(16)}, K\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x15) {
+            dumpText += `${mnemonic} DT, v${(opcodes[0] & 0x0f).toString(
+              16
+            )}\n`;
           }
           break;
 
@@ -1785,6 +1806,8 @@ async function test_generic() {
     0x00, 0xe0,
     // LD V4, K
     0xf4, 0x0a,
+    // LD DT, V4
+    0xf4, 0x15,
   ];
   chip8.loadROM(rom);
   return rom;
