@@ -649,7 +649,7 @@ class Chip8 {
           this.panic("cannot return, call stack is empty");
         }
 
-        this.PC = this.stack[this.SP--];
+        this.PC = this.stack[this.SP-- - 1];
         break;
 
       /**
@@ -1212,8 +1212,9 @@ class Chip8 {
        */
       case "ZERO":
         // halt execution
-        this.halt = true;
-        this.panicState = true;
+        // this.halt = true;
+        // this.panicState = true;
+        break;
 
       /**
        * Invalid opcode
@@ -1729,11 +1730,9 @@ class Chip8Debugger {
           break;
 
         /**
-         * Zero operations, end of program
+         * Zero operations
          */
         case "ZERO":
-          return dumpText;
-
         default:
           dumpText += `${("0" + opcodes[0].toString(16)).slice(-2)} ${(
             "0" + opcodes[1].toString(16)
@@ -1854,6 +1853,15 @@ async function test_ibm() {
   // fetch rom from /roms/ibm-logo.ch8
   let rom = await fetch("/roms/ibm-logo.ch8");
   rom = new Uint8Array(await rom.arrayBuffer());
+  chip8.loadROM(rom);
+  return rom;
+}
+
+async function test_tetris() {
+  // fetch rom from /roms/tetris.ch8
+  let rom = await fetch("/roms/tetris.ch8");
+  rom = new Uint8Array(await rom.arrayBuffer());
+  console.log(rom);
   chip8.loadROM(rom);
   return rom;
 }
@@ -2029,7 +2037,7 @@ async function test_generic() {
  * Entrypoint
  */
 async function main() {
-  await test_generic();
+  await test_tetris();
 }
 
 main();
