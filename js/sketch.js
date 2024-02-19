@@ -552,6 +552,16 @@ class Chip8 {
         return { mnemonic: "ADD", opcodes };
 
       /**
+       * Fx29 - LD F, Vx
+       * Set I = location of sprite for digit Vx.
+       *
+       * The value of I is set to the location for the hexadecimal sprite corresponding to the
+       * value of Vx.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x29:
+        return { mnemonic: "LD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -831,6 +841,15 @@ class Chip8 {
            * ST is set equal to the value of Vx.
            */
           this.ST = this.V[opcodes[0] & 0x0f];
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x29) {
+          /**
+           * Fx29 - LD F, Vx
+           * Set I = location of sprite for digit Vx.
+           *
+           * The value of I is set to the location for the hexadecimal sprite corresponding to the
+           * value of Vx.
+           */
+          this.I = 0x50 + this.V[opcodes[0] & 0x0f] * 5; // 0x50 is the offset of the fontset
         }
 
         break;
@@ -1451,6 +1470,7 @@ class Chip8Debugger {
          * Fx0A - LD Vx, K
          * Fx15 - LD DT, Vx
          * Fx18 - LD ST, Vx
+         * Fx29 - LD F, Vx
          */
         case "LD":
           if ((opcodes[0] & 0xf0) === 0x60) {
@@ -1484,12 +1504,15 @@ class Chip8Debugger {
             dumpText += `${mnemonic} ST, v${(opcodes[0] & 0x0f).toString(
               16
             )}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x29) {
+            dumpText += `${mnemonic} F, v${(opcodes[0] & 0x0f).toString(16)}\n`;
           }
           break;
 
         /**
          * 7xkk - ADD Vx, kk
          * 8xy4 - ADD Vx, Vy
+         * Fx1E - ADD I, Vx
          */
         case "ADD":
           if ((opcodes[0] & 0xf0) === 0x70) {
@@ -1839,22 +1862,20 @@ async function test_rnd_draw() {
   return rom;
 }
 
-async function test_generic() {
+async function test_input_draw() {
   let rom = [
-    // LD V4, 0x02
-    0x64, 0x02,
-    // SKNP V4
-    0xe4, 0xa1,
-    // JMP
-    0x12, 0x02,
     // CLS
     0x00, 0xe0,
-    // LD V4, K
-    0xf4, 0x0a,
-    // set I to 0x77
-    0xa0, 0x77,
-    // i+=v4
-    0xf4, 0x1e,
+    // LD v1, 0x0b
+    0x61, 0x0b,
+    // LD v2, v1
+    0x82, 0x10,
+    // LD V3, K
+    0xf3, 0x0a,
+    // LD F, V3
+    0xf3, 0x29,
+    // DRW V1, V2, 5
+    0xd1, 0x25,
   ];
   chip8.loadROM(rom);
   return rom;
@@ -1864,7 +1885,7 @@ async function test_generic() {
  * Entrypoint
  */
 async function main() {
-  await test_generic();
+  await test_input_draw();
 }
 
 main();
