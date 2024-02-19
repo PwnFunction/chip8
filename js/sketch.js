@@ -543,6 +543,15 @@ class Chip8 {
         return { mnemonic: "LD", opcodes };
 
       /**
+       * Fx1E - ADD I, Vx
+       * Set I = I + Vx.
+       *
+       * The values of I and Vx are added, and the results are stored in I.
+       */
+      case (opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x1e:
+        return { mnemonic: "ADD", opcodes };
+
+      /**
        * Zero operations
        */
       case opcodes[0] === 0x0 && opcodes[1] === 0x0:
@@ -830,6 +839,7 @@ class Chip8 {
        * Add operations
        * 7xkk - ADD Vx, byte
        * 8xy4 - ADD Vx, Vy
+       * Fx1E - ADD I, Vx
        */
       case "ADD":
         // VF write gaurd
@@ -859,6 +869,14 @@ class Chip8 {
             this.V[opcodes[0] & 0x0f] + this.V[(opcodes[1] & 0xf0) >> 0x4];
           this.V[opcodes[0] & 0x0f] = sum & 0xff;
           this.V[0xf] = sum > 0xff ? 1 : 0;
+        } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x1e) {
+          /**
+           * Fx1E - ADD I, Vx
+           * Set I = I + Vx.
+           *
+           * The values of I and Vx are added, and the results are stored in I.
+           */
+          this.I += this.V[opcodes[0] & 0x0f];
         }
         break;
 
@@ -1486,6 +1504,8 @@ class Chip8Debugger {
               (opcodes[1] & 0xf0) >>
               0x4
             ).toString(16)}\n`;
+          } else if ((opcodes[0] & 0xf0) === 0xf0 && opcodes[1] === 0x1e) {
+            dumpText += `${mnemonic} I, v${(opcodes[0] & 0x0f).toString(16)}\n`;
           }
           break;
 
@@ -1831,8 +1851,10 @@ async function test_generic() {
     0x00, 0xe0,
     // LD V4, K
     0xf4, 0x0a,
-    // LD ST, V4
-    0xf4, 0x18,
+    // set I to 0x77
+    0xa0, 0x77,
+    // i+=v4
+    0xf4, 0x1e,
   ];
   chip8.loadROM(rom);
   return rom;
