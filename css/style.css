@@ -86,15 +86,19 @@ button {
 
 /* VMEM, MEM */
 .vmem,
-.mem,
-.disass {
+.mem {
   border-bottom: 1px solid #333;
   overflow-y: scroll;
 }
+.disass > .scroll {
+  overflow-y: scroll;
+  max-height: 600px;
+}
+
 .vmem > pre,
 .mem > pre,
 .reg > pre,
-.disass > pre {
+.disass > div > pre {
   padding: 0;
   margin: 0;
   color: #999;
