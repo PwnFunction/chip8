@@ -614,6 +614,9 @@ class Chip8 {
       return;
     }
 
+    // tick
+    this.tick();
+
     // Fetch 2 bytes (2 half instructions)
     const opcodes = this.fetch();
     const { mnemonic } = this.decode(opcodes);
@@ -1228,6 +1231,13 @@ class Chip8 {
     }
   }
 
+  tick() {
+    // delay timer decrement
+    this.DT = this.DT > 0 ? this.DT - 1 : 0;
+
+    // TODO: sound timer decrement
+  }
+
   /**
    * Check VF write gaurd
    */
@@ -1837,7 +1847,7 @@ function setup() {
  * p5 draw function
  */
 async function draw() {
-  if (frameCount % 10 !== 0) {
+  if (frameCount % 200 === 0 && chip8Debugger.started && chip8.halt === false) {
     fpsText.innerText = `${parseInt(frameRate(), 10)} FPS`;
   }
 
@@ -1857,11 +1867,10 @@ async function test_ibm() {
   return rom;
 }
 
-async function test_tetris() {
-  // fetch rom from /roms/tetris.ch8
-  let rom = await fetch("/roms/tetris.ch8");
+async function test_any_rom() {
+  // fetch rom from /roms/pong.ch8
+  let rom = await fetch("/roms/pong.ch8");
   rom = new Uint8Array(await rom.arrayBuffer());
-  console.log(rom);
   chip8.loadROM(rom);
   return rom;
 }
@@ -2037,7 +2046,7 @@ async function test_generic() {
  * Entrypoint
  */
 async function main() {
-  await test_tetris();
+  await test_any_rom();
 }
 
 main();
