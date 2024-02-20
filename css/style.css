@@ -90,9 +90,12 @@ button {
   border-bottom: 1px solid #333;
   overflow-y: scroll;
 }
+.disass {
+  display: flex;
+  flex-direction: column;
+}
 .disass > .scroll {
   overflow-y: scroll;
-  max-height: 600px;
 }
 
 .vmem > pre,
