@@ -1,3 +1,3 @@
 #!/bin/sh
 
-live-server
+python3 -m http.server 
